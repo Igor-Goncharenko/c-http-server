@@ -1,0 +1,34 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-std=gnu99",
+      "-O3",
+      "-I../http_server",
+      "-Itests_util",
+      "-o",
+      "test_http_parser",
+      "test_http_parser.c"
+    ],
+    "directory": "/home/goncharenko/Projects/c-http-server/tests",
+    "file": "/home/goncharenko/Projects/c-http-server/tests/test_http_parser.c",
+    "output": "/home/goncharenko/Projects/c-http-server/tests/test_http_parser"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-std=gnu99",
+      "-O3",
+      "-I../http_server",
+      "-Itests_util",
+      "-o",
+      "test_http_server",
+      "test_http_server.c"
+    ],
+    "directory": "/home/goncharenko/Projects/c-http-server/tests",
+    "file": "/home/goncharenko/Projects/c-http-server/tests/test_http_server.c",
+    "output": "/home/goncharenko/Projects/c-http-server/tests/test_http_server"
+  }
+]
