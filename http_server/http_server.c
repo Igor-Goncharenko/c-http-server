@@ -32,7 +32,7 @@ get_header(const request_data_t *request, const char *header) {
 HTTP_SERVER_STATIC http_server_err_t 
 _find_route(const server_t *server, request_data_t *request, char **response_dest, 
         int *response_len) {
-    http_server_err_e err;
+    http_server_err_t err;
     server_route_t *found_route = NULL;
     va_list args_cpy;
 
@@ -51,23 +51,15 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
     }
 
     if (found_route == NULL) {
-        static const char resp[] = 
-            "HTTP/1.1 404 NOT FOUND\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "Content-Length: 22\r\n"
-            "\r\n"
-            "<h1>404 NOT FOUND</h1>";
-
-        *response_len = sizeof(resp);
-        *response_dest = malloc(sizeof(resp));
-        strcpy(*response_dest, resp);
+        if (HS_ERROR_CHECK(err, create_error_response(response_dest, response_len, 404))) {
+            return err;
+        }
     } else {
         char *resp;
         int resp_len;
 
         va_copy(args_cpy, found_route->args);
-        err = found_route->cb(request, args_cpy, &resp, &resp_len);
+        found_route->cb(request, args_cpy, &resp, &resp_len);
 
         static const char resp_fmt[] = 
             "HTTP/1.1 200 OK\r\n"
@@ -82,7 +74,6 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
         snprintf(*response_dest, *response_len, resp_fmt, resp_len, resp);
         free(resp);
     }
-
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
 
@@ -176,6 +167,20 @@ _get_content_len(const request_data_t *request) {
 }
 
 HTTP_SERVER_STATIC http_server_err_t 
+_send_internal_error(const int fd) {
+    http_server_err_t err;
+    char *resp;
+    int resp_len;
+    if (HS_ERROR_CHECK(err, create_error_response(&resp, &resp_len, 503))) {
+        return err;
+    }
+
+    write(fd, resp, resp_len);
+
+    return HS_CREATE_ERR(HTTP_SERVER_OK);
+}
+
+HTTP_SERVER_STATIC http_server_err_t 
 _handle_client(const server_t *server, const int fd) {
     http_server_err_t err = HS_CREATE_ERR(HTTP_SERVER_OK);
     request_data_t request = { 0 };
@@ -217,6 +222,7 @@ cleanup:
         free(request.mem);
     if (response != NULL)
         free(response);
+    _send_internal_error(fd);
     return err;
 }
 

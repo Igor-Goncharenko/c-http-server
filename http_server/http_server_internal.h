@@ -17,6 +17,7 @@ typedef enum {
     HTTP_SERVER_OK = 0,
     /* General */
     HTTP_SERVER_MALLOC_ERR,
+    HTTP_SERVER_STDIO_ERR,
     /* string errors */
     HTTP_SERVER_STRTOK_ERR,
     HTTP_SERVER_STRCPY_ERR,
@@ -150,6 +151,7 @@ buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr);
 HTTP_SERVER_LIB http_server_err_t
 parse_http_request(request_data_t *dest, buffer_t *headers_raw);
 
+
 /*
  ********************************************
  *              HTTP RESPONSE               *
@@ -158,5 +160,15 @@ parse_http_request(request_data_t *dest, buffer_t *headers_raw);
 
 HTTP_SERVER_LIB const char*
 get_http_code_str(const int code);
+
+
+/*
+ ********************************************
+ *              ERROR PAGE                  *
+ ********************************************
+ */
+
+HTTP_SERVER_LIB http_server_err_t 
+create_error_response(char **dest, int *dest_size, const int code);
 
 #endif /* HTTP_SERVER_INTERNAL_H_ */
