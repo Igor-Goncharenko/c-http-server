@@ -92,11 +92,6 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
  ********************************************
  */
 
-struct client_connection_handler {
-    server_t *server;
-    int client_fd;
-};
-
 HTTP_SERVER_STATIC http_server_err_t 
 _read_headers_raw(const int client_fd, buffer_t *dest) {
     http_server_err_t err;
