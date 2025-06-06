@@ -150,4 +150,13 @@ buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr);
 HTTP_SERVER_LIB http_server_err_t
 parse_http_request(request_data_t *dest, buffer_t *headers_raw);
 
+/*
+ ********************************************
+ *              HTTP RESPONSE               *
+ ********************************************
+ */
+
+HTTP_SERVER_LIB const char*
+get_http_code_str(const int code);
+
 #endif /* HTTP_SERVER_INTERNAL_H_ */
