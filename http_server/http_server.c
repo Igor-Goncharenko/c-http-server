@@ -70,8 +70,8 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
             "%s";
 
         *response_len = snprintf(NULL, 0, resp_fmt, resp_len, resp);
-        *response_dest = malloc(*response_len);
-        snprintf(*response_dest, *response_len, resp_fmt, resp_len, resp);
+        *response_dest = malloc(*response_len + 1);
+        snprintf(*response_dest, *response_len + 1, resp_fmt, resp_len, resp);
         free(resp);
     }
     return HS_CREATE_ERR(HTTP_SERVER_OK);
