@@ -169,13 +169,16 @@ _get_content_len(const request_data_t *request) {
 HTTP_SERVER_STATIC http_server_err_t 
 _send_internal_error(const int fd) {
     http_server_err_t err;
-    char *resp;
+    char *resp = NULL;
     int resp_len;
-    if (HS_ERROR_CHECK(err, create_error_response(&resp, &resp_len, 503))) {
+    if (HS_ERROR_CHECK(err, create_error_response(&resp, &resp_len, 500))) {
         return err;
     }
 
     write(fd, resp, resp_len);
+    if (resp != NULL) {
+        free(resp);
+    }
 
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
@@ -222,7 +225,9 @@ cleanup:
         free(request.mem);
     if (response != NULL)
         free(response);
-    _send_internal_error(fd);
+    if (err.code != HTTP_SERVER_OK) {
+        _send_internal_error(fd);
+    }
     return err;
 }
 

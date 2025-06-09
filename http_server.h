@@ -181,6 +181,7 @@ typedef enum {
     HTTP_SERVER_OK = 0,
     /* General */
     HTTP_SERVER_MALLOC_ERR,
+    HTTP_SERVER_STDIO_ERR,
     /* string errors */
     HTTP_SERVER_STRTOK_ERR,
     HTTP_SERVER_STRCPY_ERR,
@@ -314,6 +315,26 @@ buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr);
 HTTP_SERVER_LIB http_server_err_t
 parse_http_request(request_data_t *dest, buffer_t *headers_raw);
 
+
+/*
+ ********************************************
+ *              HTTP RESPONSE               *
+ ********************************************
+ */
+
+HTTP_SERVER_LIB const char*
+get_http_code_str(const int code);
+
+
+/*
+ ********************************************
+ *              ERROR PAGE                  *
+ ********************************************
+ */
+
+HTTP_SERVER_LIB http_server_err_t 
+create_error_response(char **dest, int *dest_size, const int code);
+
 #endif /* HTTP_SERVER_INTERNAL_H_ */
 
 
@@ -334,7 +355,7 @@ get_header(const request_data_t *request, const char *header) {
 HTTP_SERVER_STATIC http_server_err_t 
 _find_route(const server_t *server, request_data_t *request, char **response_dest, 
         int *response_len) {
-    http_server_err_e err;
+    http_server_err_t err;
     server_route_t *found_route = NULL;
     va_list args_cpy;
 
@@ -353,23 +374,15 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
     }
 
     if (found_route == NULL) {
-        static const char resp[] = 
-            "HTTP/1.1 404 NOT FOUND\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "Content-Length: 22\r\n"
-            "\r\n"
-            "<h1>404 NOT FOUND</h1>";
-
-        *response_len = sizeof(resp);
-        *response_dest = malloc(sizeof(resp));
-        strcpy(*response_dest, resp);
+        if (HS_ERROR_CHECK(err, create_error_response(response_dest, response_len, 404))) {
+            return err;
+        }
     } else {
         char *resp;
         int resp_len;
 
         va_copy(args_cpy, found_route->args);
-        err = found_route->cb(request, args_cpy, &resp, &resp_len);
+        found_route->cb(request, args_cpy, &resp, &resp_len);
 
         static const char resp_fmt[] = 
             "HTTP/1.1 200 OK\r\n"
@@ -384,7 +397,6 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
         snprintf(*response_dest, *response_len, resp_fmt, resp_len, resp);
         free(resp);
     }
-
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
 
@@ -393,11 +405,6 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
  *              CLIENT HANDLER              *
  ********************************************
  */
-
-struct client_connection_handler {
-    server_t *server;
-    int client_fd;
-};
 
 HTTP_SERVER_STATIC http_server_err_t 
 _read_headers_raw(const int client_fd, buffer_t *dest) {
@@ -483,6 +490,23 @@ _get_content_len(const request_data_t *request) {
 }
 
 HTTP_SERVER_STATIC http_server_err_t 
+_send_internal_error(const int fd) {
+    http_server_err_t err;
+    char *resp = NULL;
+    int resp_len;
+    if (HS_ERROR_CHECK(err, create_error_response(&resp, &resp_len, 500))) {
+        return err;
+    }
+
+    write(fd, resp, resp_len);
+    if (resp != NULL) {
+        free(resp);
+    }
+
+    return HS_CREATE_ERR(HTTP_SERVER_OK);
+}
+
+HTTP_SERVER_STATIC http_server_err_t 
 _handle_client(const server_t *server, const int fd) {
     http_server_err_t err = HS_CREATE_ERR(HTTP_SERVER_OK);
     request_data_t request = { 0 };
@@ -524,6 +548,9 @@ cleanup:
         free(request.mem);
     if (response != NULL)
         free(response);
+    if (err.code != HTTP_SERVER_OK) {
+        _send_internal_error(fd);
+    }
     return err;
 }
 
@@ -832,51 +859,6 @@ HTTP_SERVER_STATIC const char
     [HTTP_METHOD_TRACE]     = "TRACE",
 };
 
-HTTP_SERVER_STATIC const char
-*HTTP_CODE_STR[] = {
-    [100] = "CONTINUE",
-    [101] = "SWITCHING PROTOCOLS",
-    [200] = "OK",
-    [201] = "CREATED",
-    [202] = "ACCEPTED",
-    [203] = "NON-AUTHORITATIVE INFORMATION",
-    [204] = "NO CONTENT",
-    [205] = "RESET CONTENT",
-    [206] = "PARTIAL CONTENT",
-    [300] = "MULTIPLE CHOICES",
-    [301] = "MOVED PERMANENTLY",
-    [302] = "FOUND",
-    [303] = "SEE OTHER",
-    [304] = "NOT MODIFIED",
-    [305] = "USE PROXY",
-    [306] = "UNUSED",
-    [307] = "TEMPORARY REDIRECT",
-    [400] = "BAD REQUEST",
-    [401] = "UNAUTHORIZED",
-    [402] = "PAYMENT REQUIRED",
-    [403] = "FORBIDDEN",
-    [404] = "NOT FOUND",
-    [405] = "METHOD NOT ALLOWED",
-    [406] = "NOT ACCEPTABLE",
-    [407] = "PROXY AUTHENTICATION REQUIRED",
-    [408] = "REQUEST TIMEOUT",
-    [409] = "CONFLICT",
-    [410] = "GONE",
-    [411] = "LENGTH REQUIRED",
-    [412] = "PRECONDITION FAILED",
-    [413] = "REQUEST ENTITY TOO LARGE",
-    [414] = "REQUEST-URL TOO LONG",
-    [415] = "UNSUPPORTED MEDIA TYPE",
-    [416] = "REQUESTED RANGE NOT SATISFIABLE",
-    [417] = "EXPECTATION FAILED",
-    [500] = "INTERNAL SERVER ERROR",
-    [501] = "NOT IMPLEMENTED",
-    [502] = "BAD GATEWAY",
-    [503] = "SERVICE UNAVAILABLE",
-    [504] = "GATEWAY TIMEOUT",
-    [505] = "HTTP VERSION NOT SUPPORTED",
-};
-
 HTTP_SERVER_STATIC http_version_e
 _parse_http_version(const char *version_str) {
     if (version_str == NULL)
@@ -887,14 +869,6 @@ _parse_http_version(const char *version_str) {
             return (http_version_e)i;
 
     return HTTP_VERSION_UNKNOWN;
-}
-
-HTTP_SERVER_STATIC const char*
-_parse_http_code(const int code) {
-    if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8)
-        return "UNKNOWN";
-    const char *res = HTTP_CODE_STR[code];
-    return (res != NULL) ? res : "UNKNOWN";
 }
 
 HTTP_SERVER_STATIC http_method_e
@@ -1089,5 +1063,134 @@ hs_strerror(http_server_err_e err) {
 
 
 
+
+HTTP_SERVER_STATIC const char
+*HTTP_CODE_STR[] = {
+    [100] = "CONTINUE",
+    [101] = "SWITCHING PROTOCOLS",
+    [200] = "OK",
+    [201] = "CREATED",
+    [202] = "ACCEPTED",
+    [203] = "NON-AUTHORITATIVE INFORMATION",
+    [204] = "NO CONTENT",
+    [205] = "RESET CONTENT",
+    [206] = "PARTIAL CONTENT",
+    [300] = "MULTIPLE CHOICES",
+    [301] = "MOVED PERMANENTLY",
+    [302] = "FOUND",
+    [303] = "SEE OTHER",
+    [304] = "NOT MODIFIED",
+    [305] = "USE PROXY",
+    [306] = "UNUSED",
+    [307] = "TEMPORARY REDIRECT",
+    [400] = "BAD REQUEST",
+    [401] = "UNAUTHORIZED",
+    [402] = "PAYMENT REQUIRED",
+    [403] = "FORBIDDEN",
+    [404] = "NOT FOUND",
+    [405] = "METHOD NOT ALLOWED",
+    [406] = "NOT ACCEPTABLE",
+    [407] = "PROXY AUTHENTICATION REQUIRED",
+    [408] = "REQUEST TIMEOUT",
+    [409] = "CONFLICT",
+    [410] = "GONE",
+    [411] = "LENGTH REQUIRED",
+    [412] = "PRECONDITION FAILED",
+    [413] = "REQUEST ENTITY TOO LARGE",
+    [414] = "REQUEST-URL TOO LONG",
+    [415] = "UNSUPPORTED MEDIA TYPE",
+    [416] = "REQUESTED RANGE NOT SATISFIABLE",
+    [417] = "EXPECTATION FAILED",
+    [500] = "INTERNAL SERVER ERROR",
+    [501] = "NOT IMPLEMENTED",
+    [502] = "BAD GATEWAY",
+    [503] = "SERVICE UNAVAILABLE",
+    [504] = "GATEWAY TIMEOUT",
+    [505] = "HTTP VERSION NOT SUPPORTED",
+};
+
+HTTP_SERVER_LIB const char*
+get_http_code_str(const int code) {
+    if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8)
+        return "UNKNOWN";
+    const char *res = HTTP_CODE_STR[code];
+    return (res != NULL) ? res : "UNKNOWN";
+}
+
+
+
+
+static const char 
+ERROR_FMT[] = 
+"HTTP/1.1 %3d %s\r\n"
+"Content-Length: %d\r\n"
+"Content-Type: text/html\r\n"
+"Connection: Closed\r\n"
+"\r\n";
+
+static const char 
+ERROR_PAGE_BODY[] = 
+"<!DOCTYPE html>"
+"<html lang=\"en\">"
+"<head>"
+"<meta charset=\"UTF-8\">"
+"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+"<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">"
+"<title>%3d %s</title>"
+"</head>"
+"<body>"
+"<h1>Failed to load page</h1>"
+"<h1>%3d %s</h1>"
+"</body>"
+"</html>";
+
+HTTP_SERVER_LIB http_server_err_t 
+create_error_response(char **dest, int *dest_size, const int code) {
+    http_server_err_e err_e;
+
+    *dest = NULL;
+    *dest_size = 0;
+
+    const char *code_str = get_http_code_str(code);
+    const int code_len = strlen(code_str);
+    const int header_len = sizeof(ERROR_FMT) + code_len;
+    const int content_len = sizeof(ERROR_PAGE_BODY) + code_len * 2;
+
+    if ((*dest = malloc(header_len + content_len + 10)) == NULL) {
+        err_e = HTTP_SERVER_MALLOC_ERR;
+        goto failed;
+    }
+
+    const int fin_content_len = snprintf(NULL, 0, ERROR_PAGE_BODY, code, code_str, code, code_str);
+    if (fin_content_len <= 0) {
+        err_e = HTTP_SERVER_STDIO_ERR;
+        goto failed;
+    }
+
+    const int fin_header_len = snprintf(*dest, header_len, ERROR_FMT, code, code_str, 
+            fin_content_len);
+    if (fin_content_len <= 0) {
+        err_e = HTTP_SERVER_STDIO_ERR;
+        goto failed;
+    }
+
+    if (snprintf(*dest + fin_header_len, content_len, ERROR_PAGE_BODY, code, code_str, code, 
+                code_str) <= 0) {
+        err_e = HTTP_SERVER_STDIO_ERR;
+        goto failed;
+    }
+
+    *dest_size = fin_header_len + fin_content_len;
+
+    return HS_CREATE_ERR(HTTP_SERVER_OK);
+
+failed:
+    if (*dest != NULL) {
+        free(*dest);
+        *dest = NULL;
+    }
+    *dest_size = 0;
+    return HS_CREATE_ERR(err_e);
+}
 
 #endif /* HTTP_SERVER_IMPLEMENTATION */
