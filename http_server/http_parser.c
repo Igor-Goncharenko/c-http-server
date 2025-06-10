@@ -4,12 +4,12 @@
 #include "http_server.h"
 #include "http_server_internal.h"
 
-HTTP_SERVER_STATIC const char
+static const char
 *HTTP_VERSION_STR[HTTP_VERSION_LAST] = {
     [HTTP_VERSION_1_1] = "HTTP/1.1",
 };
 
-HTTP_SERVER_STATIC const char
+static const char
 *HTTP_METHODS_STR[] = {
     [HTTP_METHOD_GET]       = "GET",
     [HTTP_METHOD_HEAD]      = "HEAD",
