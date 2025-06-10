@@ -13,7 +13,7 @@ compile:
 	$(CC) $(CFLAGS) -o $(OUT) $(SRC)
 
 debug:
-	gdb ./$(OUT)
+	gdb -tui ./$(OUT)
 
 clean:
 	rm -f $(OUT)

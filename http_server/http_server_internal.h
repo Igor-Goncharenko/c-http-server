@@ -15,6 +15,7 @@
 
 typedef enum {
     HTTP_SERVER_OK = 0,
+    HTTP_SERVER_ROUTE_ERR,
     /* General */
     HTTP_SERVER_MALLOC_ERR,
     HTTP_SERVER_STDIO_ERR,
@@ -30,6 +31,7 @@ typedef enum {
     HTTP_SERVER_LISTEN_ERR,
     HTTP_SERVER_EPOLL_CREATE_ERR,
     HTTP_SERVER_EPOLL_CTL_ERR,
+    HTTP_SERVER_WRITE_ERR,
     /* Socket errors */
     HTTP_SERVER_SOCKET_READ_ERR,
     /* buffer errors */

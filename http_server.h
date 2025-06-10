@@ -179,6 +179,7 @@ get_header(const request_data_t *request, const char *header);
 
 typedef enum {
     HTTP_SERVER_OK = 0,
+    HTTP_SERVER_ROUTE_ERR,
     /* General */
     HTTP_SERVER_MALLOC_ERR,
     HTTP_SERVER_STDIO_ERR,
@@ -194,6 +195,7 @@ typedef enum {
     HTTP_SERVER_LISTEN_ERR,
     HTTP_SERVER_EPOLL_CREATE_ERR,
     HTTP_SERVER_EPOLL_CTL_ERR,
+    HTTP_SERVER_WRITE_ERR,
     /* Socket errors */
     HTTP_SERVER_SOCKET_READ_ERR,
     /* buffer errors */
@@ -351,11 +353,14 @@ get_header(const request_data_t *request, const char *header) {
     return NULL;
 }
 
+/*
+ ********************************************
+ *                  ROUTE                   *
+ ********************************************
+ */
 
-HTTP_SERVER_STATIC http_server_err_t 
-_find_route(const server_t *server, request_data_t *request, char **response_dest, 
-        int *response_len) {
-    http_server_err_t err;
+HTTP_SERVER_STATIC server_route_t* 
+_find_route(const server_t *server, const request_data_t *request) {
     server_route_t *found_route = NULL;
     va_list args_cpy;
 
@@ -373,29 +378,68 @@ _find_route(const server_t *server, request_data_t *request, char **response_des
         }
     }
 
+    return found_route;
+}
+
+HTTP_SERVER_STATIC http_server_err_t 
+_process_route(server_route_t *route, const request_data_t *request, char **resp_dest, 
+        int *resp_len) {
+    static const char resp_fmt[] = 
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Connection: close\r\n"
+        "Content-Length: %d\r\n"
+        "\r\n";
+
+    http_server_err_e err_e = HTTP_SERVER_OK;
+    char *resp = NULL;
+    int re_len;
+    va_list args_cpy;
+
+    va_copy(args_cpy, route->args);
+
+    if (route->cb(request, args_cpy, &resp, &re_len) != 0) {
+        err_e = HTTP_SERVER_ROUTE_ERR;
+        goto cleanup;
+    }
+    if ((*resp_dest = malloc(re_len + sizeof(resp_fmt) + 100)) == NULL) {
+        err_e = HTTP_SERVER_MALLOC_ERR;
+        goto cleanup;
+    }
+    if ((*resp_len = sprintf(*resp_dest, resp_fmt, re_len)) <= 0) {
+        err_e = HTTP_SERVER_STDIO_ERR;
+        goto cleanup;
+    }
+    if (strcat(*resp_dest, resp) == NULL) {
+        err_e = HTTP_SERVER_STRCAT_ERR;
+        goto cleanup;
+    }
+
+    *resp_len += re_len;
+
+cleanup:
+    if (resp != NULL) free(resp);
+    return HS_CREATE_ERR(err_e);
+}
+
+HTTP_SERVER_STATIC http_server_err_t 
+_form_response(const server_t *server, const request_data_t *request, char **resp_dest, 
+        int *resp_len) {
+    http_server_err_t err;
+    server_route_t *found_route = _find_route(server, request);
+
+    *resp_dest = NULL;
+    *resp_len = 0;
+
     if (found_route == NULL) {
-        if (HS_ERROR_CHECK(err, create_error_response(response_dest, response_len, 404))) {
+        if (HS_ERROR_CHECK(err, create_error_response(resp_dest, resp_len, 404)))
+            return err;
+    } else {
+        if (HS_ERROR_CHECK(err, _process_route(found_route, request, resp_dest, resp_len))) {
+            *resp_dest = NULL;
+            *resp_len = 0;
             return err;
         }
-    } else {
-        char *resp;
-        int resp_len;
-
-        va_copy(args_cpy, found_route->args);
-        found_route->cb(request, args_cpy, &resp, &resp_len);
-
-        static const char resp_fmt[] = 
-            "HTTP/1.1 200 OK\r\n"
-            "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
-            "Content-Length: %d\r\n"
-            "\r\n"
-            "%s";
-
-        *response_len = snprintf(NULL, 0, resp_fmt, resp_len, resp);
-        *response_dest = malloc(*response_len);
-        snprintf(*response_dest, *response_len + 1, resp_fmt, resp_len, resp);
-        free(resp);
     }
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
@@ -515,7 +559,6 @@ _handle_client(const server_t *server, const int fd) {
     char *response = NULL;
     int response_len = 0;
 
-    /* read request section */
     fprintf(stdout, "New client: %d\n", fd);    // TODO: delete print
 
     if (HS_ERROR_CHECK(err, _read_headers_raw(fd, &headers_raw)))
@@ -534,23 +577,23 @@ _handle_client(const server_t *server, const int fd) {
         request.content = content_buf.data;
     }
 
-    if (HS_ERROR_CHECK(err, _find_route(server, &request, &response, &response_len)))
+    if (HS_ERROR_CHECK(err, _form_response(server, &request, &response, &response_len)))
         goto cleanup;
 
-    /* send response section */
-    if (response_len > 0 && write(fd, response, response_len) == -1)
+    printf("%s\n", request.route);
+
+    if (response_len > 0 && response != NULL && write(fd, response, response_len) == -1) {
+        err = HS_CREATE_ERR(HTTP_SERVER_WRITE_ERR);
         goto cleanup;
+    }
 
 cleanup:
     buffer_free(&headers_raw);
     buffer_free(&content_buf);
-    if (request.mem != NULL)
-        free(request.mem);
-    if (response != NULL)
-        free(response);
-    if (err.code != HTTP_SERVER_OK) {
-        _send_internal_error(fd);
-    }
+    if (request.mem != NULL) free(request.mem);
+    if (response != NULL) free(response);
+    if (err.code != HTTP_SERVER_OK) _send_internal_error(fd);
+
     return err;
 }
 
