@@ -1021,7 +1021,7 @@ hs_strerror(http_server_err_e err) {
 
 
 
-HTTP_SERVER_STATIC const char
+static const char
 *HTTP_CODE_STR[] = {
     [100] = "CONTINUE",
     [101] = "SWITCHING PROTOCOLS",
@@ -1165,7 +1165,11 @@ form_response(const server_t *server, const request_data_t *request, char **resp
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
 
-
+/*
+ ********************************************
+ *              ERROR PAGE                  *
+ ********************************************
+ */
 
 static const char 
 ERROR_FMT[] = 
@@ -1239,5 +1243,6 @@ failed:
     *dest_size = 0;
     return HS_CREATE_ERR(err_e);
 }
+
 
 #endif /* HTTP_SERVER_IMPLEMENTATION */
