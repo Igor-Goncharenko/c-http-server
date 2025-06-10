@@ -163,6 +163,10 @@ parse_http_request(request_data_t *dest, buffer_t *headers_raw);
 HTTP_SERVER_LIB const char*
 get_http_code_str(const int code);
 
+HTTP_SERVER_LIB http_server_err_t 
+form_response(const server_t *server, const request_data_t *request, char **resp_dest, 
+        int *resp_len);
+
 
 /*
  ********************************************

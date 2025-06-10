@@ -30,97 +30,6 @@ get_header(const request_data_t *request, const char *header) {
 
 /*
  ********************************************
- *                  ROUTE                   *
- ********************************************
- */
-
-HTTP_SERVER_STATIC server_route_t* 
-_find_route(const server_t *server, const request_data_t *request) {
-    server_route_t *found_route = NULL;
-    va_list args_cpy;
-
-    for (int i = 0; i < server->n_routes; i++) {
-        server_route_t *route = &server->routes[i];
-        if (route->n_args > 0) {
-            va_copy(args_cpy, route->args);
-            if (vsscanf(request->route, route->route_tmp, args_cpy) == route->n_args) {
-                found_route = route;
-                break;
-            }
-        } else if (strcmp(route->route_tmp, request->route) == 0) {
-            found_route = route;
-            break;
-        }
-    }
-
-    return found_route;
-}
-
-HTTP_SERVER_STATIC http_server_err_t 
-_process_route(server_route_t *route, const request_data_t *request, char **resp_dest, 
-        int *resp_len) {
-    static const char resp_fmt[] = 
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
-        "Connection: close\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n";
-
-    http_server_err_e err_e = HTTP_SERVER_OK;
-    char *resp = NULL;
-    int re_len;
-    va_list args_cpy;
-
-    va_copy(args_cpy, route->args);
-
-    if (route->cb(request, args_cpy, &resp, &re_len) != 0) {
-        err_e = HTTP_SERVER_ROUTE_ERR;
-        goto cleanup;
-    }
-    if ((*resp_dest = malloc(re_len + sizeof(resp_fmt) + 100)) == NULL) {
-        err_e = HTTP_SERVER_MALLOC_ERR;
-        goto cleanup;
-    }
-    if ((*resp_len = sprintf(*resp_dest, resp_fmt, re_len)) <= 0) {
-        err_e = HTTP_SERVER_STDIO_ERR;
-        goto cleanup;
-    }
-    if (strcat(*resp_dest, resp) == NULL) {
-        err_e = HTTP_SERVER_STRCAT_ERR;
-        goto cleanup;
-    }
-
-    *resp_len += re_len;
-
-cleanup:
-    if (resp != NULL) free(resp);
-    return HS_CREATE_ERR(err_e);
-}
-
-HTTP_SERVER_STATIC http_server_err_t 
-_form_response(const server_t *server, const request_data_t *request, char **resp_dest, 
-        int *resp_len) {
-    http_server_err_t err;
-    server_route_t *found_route = _find_route(server, request);
-
-    *resp_dest = NULL;
-    *resp_len = 0;
-
-    if (found_route == NULL) {
-        if (HS_ERROR_CHECK(err, create_error_response(resp_dest, resp_len, 404)))
-            return err;
-    } else {
-        if (HS_ERROR_CHECK(err, _process_route(found_route, request, resp_dest, resp_len))) {
-            *resp_dest = NULL;
-            *resp_len = 0;
-            return err;
-        }
-    }
-    return HS_CREATE_ERR(HTTP_SERVER_OK);
-}
-
-/*
- ********************************************
  *              CLIENT HANDLER              *
  ********************************************
  */
@@ -252,7 +161,7 @@ _handle_client(const server_t *server, const int fd) {
         request.content = content_buf.data;
     }
 
-    if (HS_ERROR_CHECK(err, _form_response(server, &request, &response, &response_len)))
+    if (HS_ERROR_CHECK(err, form_response(server, &request, &response, &response_len)))
         goto cleanup;
 
     printf("%s\n", request.route);
