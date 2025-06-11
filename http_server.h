@@ -464,6 +464,22 @@ _send_internal_error(const int fd) {
 }
 
 HTTP_SERVER_STATIC http_server_err_t 
+_send_response(const int fd, const char *response, const int response_len) {
+    if (response_len <= 0 || response == NULL) return HS_CREATE_ERR(HTTP_SERVER_WRITE_ERR);
+    int bytes_sent = 0;
+
+    while (bytes_sent < response_len) {
+        int n = write(fd, response + bytes_sent, response_len - bytes_sent);
+        if (n == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            return HS_CREATE_ERR(HTTP_SERVER_WRITE_ERR);
+        }
+        bytes_sent += n;
+    }
+    return HS_CREATE_ERR(HTTP_SERVER_OK);
+}
+
+HTTP_SERVER_STATIC http_server_err_t 
 _handle_client(const server_t *server, const int fd) {
     http_server_err_t err = HS_CREATE_ERR(HTTP_SERVER_OK);
     request_data_t request = { 0 };
@@ -493,12 +509,8 @@ _handle_client(const server_t *server, const int fd) {
     if (HS_ERROR_CHECK(err, form_response(server, &request, &response, &response_len)))
         goto cleanup;
 
-    printf("%s\n", request.route);
-
-    if (response_len > 0 && response != NULL && write(fd, response, response_len) == -1) {
-        err = HS_CREATE_ERR(HTTP_SERVER_WRITE_ERR);
+    if (HS_ERROR_CHECK(err, _send_response(fd, response, response_len))) 
         goto cleanup;
-    }
 
 cleanup:
     buffer_free(&headers_raw);
