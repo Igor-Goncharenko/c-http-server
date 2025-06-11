@@ -60,6 +60,80 @@ get_http_code_str(const int code) {
 
 /*
  ********************************************
+ *              CONTENT TYPES               *
+ ********************************************
+ */
+
+HTTP_SERVER_STATIC const char *
+_get_content_main_type_str(hs_content_main_type_e t) {
+    static const char *MAIN_TYPE_STR[] = {
+        [HS_CONTENT_TYPE_TEXT] = "text",
+        [HS_CONTENT_TYPE_IMAGE] = "image",
+        [HS_CONTENT_TYPE_APPLICATION] = "application",
+    };
+    const char *res = MAIN_TYPE_STR[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content main type '%d'. Return just 'text'.\n", t);
+        return MAIN_TYPE_STR[HS_CONTENT_TYPE_TEXT];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC const char *
+_get_content_subtype_text_str(hs_content_subtype_text_e t) {
+    static const char *SUBTYPE_TEXT[] = {
+        [HS_SUBTYPE_TEXT_PLAIN] = "plain",
+        [HS_SUBTYPE_TEXT_HTML] = "html",
+        [HS_SUBTYPE_TEXT_CSS] = "css",
+        [HS_SUBTYPE_TEXT_CSV] = "csv",
+        [HS_SUBTYPE_TEXT_XML] = "xml",
+    };
+    const char *res = SUBTYPE_TEXT[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content text subtype '%d'. Return just 'text'.\n", t);
+        return SUBTYPE_TEXT[HS_SUBTYPE_TEXT_PLAIN];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC const char *
+_get_content_subtype_image_str(hs_content_subtype_image_e t) {
+    static const char *SUBTYPE_IMAGE[] = {
+        [HS_SUBTYPE_IMAGE_JPEG] = "jpeg",
+        [HS_SUBTYPE_IMAGE_PNG] = "png",
+        [HS_SUBTYPE_IMAGE_GIF] = "gif",
+        [HS_SUBTYPE_IMAGE_WEBP] = "webp",
+        [HS_SUBTYPE_IMAGE_SVG] = "svg+xml",
+        [HS_SUBTYPE_IMAGE_AVIF] = "avif",
+    };
+    const char *res = SUBTYPE_IMAGE[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content image subtype '%d'. Return just 'text'.\n", t);
+        return SUBTYPE_IMAGE[HS_SUBTYPE_IMAGE_JPEG];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC const char *
+_get_content_subtype_application_str(hs_content_subtype_application_e t) {
+    static const char *SUBTYPE_APPLICATION[] = {
+        [HS_SUBTYPE_APPLICATION_JSON] = "json",
+        [HS_SUBTYPE_APPLICATION_XML] = "xml",
+        [HS_SUBTYPE_APPLICATION_PDF] = "pdf",
+        [HS_SUBTYPE_APPLICATION_ZIP] = "zip",
+        [HS_SUBTYPE_APPLICATION_JAVASCRIPT] = "javascript",
+        [HS_SUBTYPE_APPLICATION_WASM] = "wasm",
+    };
+    const char *res = SUBTYPE_APPLICATION[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content application subtype '%d'. Return just 'text'.\n", t);
+        return SUBTYPE_APPLICATION[HS_SUBTYPE_APPLICATION_JSON];
+    }
+    return res;
+}
+
+/*
+ ********************************************
  *                  ROUTE                   *
  ********************************************
  */
