@@ -25,6 +25,53 @@ extern "C" {
 
 /*
  ********************************************
+ *              CONTENT TYPES               *
+ ********************************************
+ */
+
+typedef enum {
+    HS_CONTENT_TYPE_TEXT = 0,
+    HS_CONTENT_TYPE_IMAGE,
+    HS_CONTENT_TYPE_APPLICATION,
+} hs_content_main_type_e;
+
+typedef enum {
+    HS_SUBTYPE_TEXT_PLAIN = 0,
+    HS_SUBTYPE_TEXT_HTML,
+    HS_SUBTYPE_TEXT_CSS,
+    HS_SUBTYPE_TEXT_CSV,
+    HS_SUBTYPE_TEXT_XML,
+} hs_content_subtype_text_e;
+
+typedef enum {
+    HS_SUBTYPE_IMAGE_JPEG = 0,
+    HS_SUBTYPE_IMAGE_PNG,
+    HS_SUBTYPE_IMAGE_GIF,
+    HS_SUBTYPE_IMAGE_WEBP,
+    HS_SUBTYPE_IMAGE_SVG,
+    HS_SUBTYPE_IMAGE_AVIF,
+} hs_content_subtype_image_e;
+
+typedef enum {
+    HS_SUBTYPE_APPLICATION_JSON = 0,
+    HS_SUBTYPE_APPLICATION_XML,
+    HS_SUBTYPE_APPLICATION_PDF,
+    HS_SUBTYPE_APPLICATION_ZIP,
+    HS_SUBTYPE_APPLICATION_JAVASCRIPT,
+    HS_SUBTYPE_APPLICATION_WASM,
+} hs_content_subtype_application_e;
+
+typedef struct {
+    hs_content_main_type_e type;
+    union {
+        hs_content_subtype_text_e text;
+        hs_content_subtype_image_e image;
+        hs_content_subtype_application_e application;
+    };
+} hs_content_type_t;
+
+/*
+ ********************************************
  *          HTTP REQUEST/RESPONSE           *
  ********************************************
  */
@@ -88,6 +135,8 @@ typedef struct {
     route_callback      cb;
     va_list             args;
     int                 n_args;
+
+    hs_content_type_t   content_type;
 } server_route_t;
 
 typedef struct {
