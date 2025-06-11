@@ -106,4 +106,3 @@ buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr) 
         *beginning_ptr = self->mem + self->len - other->len;
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
-

@@ -166,9 +166,10 @@ get_header(const request_data_t *request, const char *header);
 #include <sys/epoll.h>
 #include <sys/socket.h>
 
+
+/* http_server/http_server_internal.h */
 #ifndef HTTP_SERVER_INTERNAL_H_
 #define HTTP_SERVER_INTERNAL_H_
-
 
 
 /*
@@ -343,7 +344,7 @@ create_error_response(char **dest, int *dest_size, const int code);
 
 #endif /* HTTP_SERVER_INTERNAL_H_ */
 
-
+/* http_server/http_server.c */
 #define READ_HEADERS_CHARS_LIMIT        8192
 #define READ_BUFFER_LEN                 1024
 
@@ -709,7 +710,7 @@ start_server(server_t *self) {
     return 0;
 }
 
-
+/* http_server/buffer.c */
 #define BUFFER_START_CAP    64
 
 HTTP_SERVER_LIB http_server_err_t
@@ -808,8 +809,7 @@ buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr) 
     return HS_CREATE_ERR(HTTP_SERVER_OK);
 }
 
-
-
+/* http_server/http_parser.c */
 static const char
 *HTTP_VERSION_STR[HTTP_VERSION_LAST] = {
     [HTTP_VERSION_1_1] = "HTTP/1.1",
@@ -949,7 +949,7 @@ cleanup:
     return err;
 }
 
-
+/* http_server/logger.c */
 
 static const char
 *_level_strings[] = {
@@ -991,7 +991,7 @@ log_log(const log_level_e level, const int line, const char *file, const char *f
     va_end(args);
 }
 
-
+/* http_server/error.c */
 
 HTTP_SERVER_LIB const char*
 hs_strerror(http_server_err_e err) {
@@ -1029,9 +1029,7 @@ hs_strerror(http_server_err_e err) {
     return res;
 }
 
-
-
-
+/* http_server/http_response.c */
 
 static const char
 *HTTP_CODE_STR[] = {
@@ -1255,6 +1253,5 @@ failed:
     *dest_size = 0;
     return HS_CREATE_ERR(err_e);
 }
-
 
 #endif /* HTTP_SERVER_IMPLEMENTATION */

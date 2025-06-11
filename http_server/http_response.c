@@ -227,4 +227,3 @@ failed:
     *dest_size = 0;
     return HS_CREATE_ERR(err_e);
 }
-

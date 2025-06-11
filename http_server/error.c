@@ -38,6 +38,3 @@ hs_strerror(http_server_err_e err) {
 
     return res;
 }
-
-
-

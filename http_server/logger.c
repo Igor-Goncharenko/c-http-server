@@ -43,4 +43,3 @@ log_log(const log_level_e level, const int line, const char *file, const char *f
 
     va_end(args);
 }
-
