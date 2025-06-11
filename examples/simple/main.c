@@ -55,6 +55,10 @@ int main(int argc, char *argv[]) {
             .route_tmp = "/",
             .cb = home_callback,
             .n_args = 0,
+            .content_type = {
+                .type = HS_CONTENT_TYPE_TEXT,
+                .subtype.text = HS_SUBTYPE_TEXT_HTML,
+            },
         },
     };
 

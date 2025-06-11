@@ -29,6 +29,53 @@ extern "C" {
 
 /*
  ********************************************
+ *              CONTENT TYPES               *
+ ********************************************
+ */
+
+typedef enum {
+    HS_CONTENT_TYPE_TEXT = 0,
+    HS_CONTENT_TYPE_IMAGE,
+    HS_CONTENT_TYPE_APPLICATION,
+} hs_content_main_type_e;
+
+typedef enum {
+    HS_SUBTYPE_TEXT_PLAIN = 0,
+    HS_SUBTYPE_TEXT_HTML,
+    HS_SUBTYPE_TEXT_CSS,
+    HS_SUBTYPE_TEXT_CSV,
+    HS_SUBTYPE_TEXT_XML,
+} hs_content_subtype_text_e;
+
+typedef enum {
+    HS_SUBTYPE_IMAGE_JPEG = 0,
+    HS_SUBTYPE_IMAGE_PNG,
+    HS_SUBTYPE_IMAGE_GIF,
+    HS_SUBTYPE_IMAGE_WEBP,
+    HS_SUBTYPE_IMAGE_SVG,
+    HS_SUBTYPE_IMAGE_AVIF,
+} hs_content_subtype_image_e;
+
+typedef enum {
+    HS_SUBTYPE_APPLICATION_JSON = 0,
+    HS_SUBTYPE_APPLICATION_XML,
+    HS_SUBTYPE_APPLICATION_PDF,
+    HS_SUBTYPE_APPLICATION_ZIP,
+    HS_SUBTYPE_APPLICATION_JAVASCRIPT,
+    HS_SUBTYPE_APPLICATION_WASM,
+} hs_content_subtype_application_e;
+
+typedef struct {
+    hs_content_main_type_e type;
+    union {
+        hs_content_subtype_text_e text;
+        hs_content_subtype_image_e image;
+        hs_content_subtype_application_e application;
+    } subtype;
+} hs_content_type_t;
+
+/*
+ ********************************************
  *          HTTP REQUEST/RESPONSE           *
  ********************************************
  */
@@ -92,6 +139,8 @@ typedef struct {
     route_callback      cb;
     va_list             args;
     int                 n_args;
+
+    hs_content_type_t   content_type;
 } server_route_t;
 
 typedef struct {
@@ -1086,6 +1135,97 @@ get_http_code_str(const int code) {
 
 /*
  ********************************************
+ *              CONTENT TYPES               *
+ ********************************************
+ */
+
+HTTP_SERVER_STATIC const char *
+_get_content_main_type_str(hs_content_main_type_e t) {
+    static const char *MAIN_TYPE_STR[] = {
+        [HS_CONTENT_TYPE_TEXT] = "text",
+        [HS_CONTENT_TYPE_IMAGE] = "image",
+        [HS_CONTENT_TYPE_APPLICATION] = "application",
+    };
+    const char *res = MAIN_TYPE_STR[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content main type '%d'. Return just 'text'.\n", t);
+        return MAIN_TYPE_STR[HS_CONTENT_TYPE_TEXT];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC const char *
+_get_content_subtype_text_str(hs_content_subtype_text_e t) {
+    static const char *SUBTYPE_TEXT[] = {
+        [HS_SUBTYPE_TEXT_PLAIN] = "plain",
+        [HS_SUBTYPE_TEXT_HTML] = "html",
+        [HS_SUBTYPE_TEXT_CSS] = "css",
+        [HS_SUBTYPE_TEXT_CSV] = "csv",
+        [HS_SUBTYPE_TEXT_XML] = "xml",
+    };
+    const char *res = SUBTYPE_TEXT[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content text subtype '%d'. Return just 'text'.\n", t);
+        return SUBTYPE_TEXT[HS_SUBTYPE_TEXT_PLAIN];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC const char *
+_get_content_subtype_image_str(hs_content_subtype_image_e t) {
+    static const char *SUBTYPE_IMAGE[] = {
+        [HS_SUBTYPE_IMAGE_JPEG] = "jpeg",
+        [HS_SUBTYPE_IMAGE_PNG] = "png",
+        [HS_SUBTYPE_IMAGE_GIF] = "gif",
+        [HS_SUBTYPE_IMAGE_WEBP] = "webp",
+        [HS_SUBTYPE_IMAGE_SVG] = "svg+xml",
+        [HS_SUBTYPE_IMAGE_AVIF] = "avif",
+    };
+    const char *res = SUBTYPE_IMAGE[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content image subtype '%d'. Return just 'text'.\n", t);
+        return SUBTYPE_IMAGE[HS_SUBTYPE_IMAGE_JPEG];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC const char *
+_get_content_subtype_application_str(hs_content_subtype_application_e t) {
+    static const char *SUBTYPE_APPLICATION[] = {
+        [HS_SUBTYPE_APPLICATION_JSON] = "json",
+        [HS_SUBTYPE_APPLICATION_XML] = "xml",
+        [HS_SUBTYPE_APPLICATION_PDF] = "pdf",
+        [HS_SUBTYPE_APPLICATION_ZIP] = "zip",
+        [HS_SUBTYPE_APPLICATION_JAVASCRIPT] = "javascript",
+        [HS_SUBTYPE_APPLICATION_WASM] = "wasm",
+    };
+    const char *res = SUBTYPE_APPLICATION[t];
+    if (res == NULL) {
+        LOG_ERROR("Unknown content application subtype '%d'. Return just 'text'.\n", t);
+        return SUBTYPE_APPLICATION[HS_SUBTYPE_APPLICATION_JSON];
+    }
+    return res;
+}
+
+HTTP_SERVER_STATIC void 
+_get_content_type_str(hs_content_type_t t, const char **type, const char **subtype) {
+    *type = _get_content_main_type_str(t.type);
+
+    switch (t.type) {
+        case HS_CONTENT_TYPE_TEXT:
+            *subtype = _get_content_subtype_text_str(t.subtype.text);
+            break;
+        case HS_CONTENT_TYPE_IMAGE:
+            *subtype = _get_content_subtype_image_str(t.subtype.image);
+            break;
+        case HS_CONTENT_TYPE_APPLICATION:
+            *subtype = _get_content_subtype_application_str(t.subtype.application);
+            break;
+    }
+}
+
+/*
+ ********************************************
  *                  ROUTE                   *
  ********************************************
  */
@@ -1117,27 +1257,31 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
         int *resp_len) {
     static const char resp_fmt[] = 
         "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
+        "Content-Type: %s/%s\r\n"
         "Connection: close\r\n"
         "Content-Length: %d\r\n"
         "\r\n";
 
     http_server_err_e err_e = HTTP_SERVER_OK;
+    const char *type_str, *subtype_str;
     char *resp = NULL;
     int re_len;
     va_list args_cpy;
 
     va_copy(args_cpy, route->args);
 
+    _get_content_type_str(route->content_type, &type_str, &subtype_str);
+
     if (route->cb(request, args_cpy, &resp, &re_len) != 0) {
         err_e = HTTP_SERVER_ROUTE_ERR;
         goto cleanup;
     }
-    if ((*resp_dest = malloc(re_len + sizeof(resp_fmt) + 100)) == NULL) {
+
+    if ((*resp_dest = malloc(re_len + sizeof(resp_fmt) + 256)) == NULL) {
         err_e = HTTP_SERVER_MALLOC_ERR;
         goto cleanup;
     }
-    if ((*resp_len = sprintf(*resp_dest, resp_fmt, re_len)) <= 0) {
+    if ((*resp_len = sprintf(*resp_dest, resp_fmt, type_str, subtype_str, re_len)) <= 0) {
         err_e = HTTP_SERVER_STDIO_ERR;
         goto cleanup;
     }
