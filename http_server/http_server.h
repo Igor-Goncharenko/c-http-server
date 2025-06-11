@@ -67,7 +67,7 @@ typedef struct {
         hs_content_subtype_text_e text;
         hs_content_subtype_image_e image;
         hs_content_subtype_application_e application;
-    };
+    } subtype;
 } hs_content_type_t;
 
 /*

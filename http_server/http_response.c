@@ -132,6 +132,23 @@ _get_content_subtype_application_str(hs_content_subtype_application_e t) {
     return res;
 }
 
+HTTP_SERVER_STATIC void 
+_get_content_type_str(hs_content_type_t t, const char **type, const char **subtype) {
+    *type = _get_content_main_type_str(t.type);
+
+    switch (t.type) {
+        case HS_CONTENT_TYPE_TEXT:
+            *subtype = _get_content_subtype_text_str(t.subtype.text);
+            break;
+        case HS_CONTENT_TYPE_IMAGE:
+            *subtype = _get_content_subtype_image_str(t.subtype.image);
+            break;
+        case HS_CONTENT_TYPE_APPLICATION:
+            *subtype = _get_content_subtype_application_str(t.subtype.application);
+            break;
+    }
+}
+
 /*
  ********************************************
  *                  ROUTE                   *
@@ -165,27 +182,31 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
         int *resp_len) {
     static const char resp_fmt[] = 
         "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
+        "Content-Type: %s/%s\r\n"
         "Connection: close\r\n"
         "Content-Length: %d\r\n"
         "\r\n";
 
     http_server_err_e err_e = HTTP_SERVER_OK;
+    const char *type_str, *subtype_str;
     char *resp = NULL;
     int re_len;
     va_list args_cpy;
 
     va_copy(args_cpy, route->args);
 
+    _get_content_type_str(route->content_type, &type_str, &subtype_str);
+
     if (route->cb(request, args_cpy, &resp, &re_len) != 0) {
         err_e = HTTP_SERVER_ROUTE_ERR;
         goto cleanup;
     }
-    if ((*resp_dest = malloc(re_len + sizeof(resp_fmt) + 100)) == NULL) {
+
+    if ((*resp_dest = malloc(re_len + sizeof(resp_fmt) + 256)) == NULL) {
         err_e = HTTP_SERVER_MALLOC_ERR;
         goto cleanup;
     }
-    if ((*resp_len = sprintf(*resp_dest, resp_fmt, re_len)) <= 0) {
+    if ((*resp_len = sprintf(*resp_dest, resp_fmt, type_str, subtype_str, re_len)) <= 0) {
         err_e = HTTP_SERVER_STDIO_ERR;
         goto cleanup;
     }
