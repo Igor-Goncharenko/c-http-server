@@ -1222,8 +1222,8 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
     }
 
     if (resp.content_len > 0) {
-        if (strcat(*resp_dest, resp.content) == NULL) {
-            err_e = HTTP_SERVER_STRCAT_ERR;
+        if (memcpy((*resp_dest) + (*resp_len), resp.content, resp.content_len) == NULL) {
+            err_e = HTTP_SERVER_MEMCPY_ERR;
             goto cleanup;
         }
         *resp_len += resp.content_len;

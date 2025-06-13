@@ -7,7 +7,7 @@
 #include <signal.h>
 #include <string.h>
 
-#define n_routes 1
+#define n_routes 2
 
 int home_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
     static const char home_resp[] = "<h1>Home page!</h1>";
@@ -19,6 +19,24 @@ int home_callback(const request_data_t *request, const va_list args, hs_response
     strcpy(dest->content, home_resp);
 
     hs_response_add_header(dest, "Test-header", "Test header value");
+
+    return 0;
+}
+
+int favicon_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
+    const char file[] = "favicon.ico";
+    FILE *fd = fopen(file, "rb");
+    fseek(fd, 0, SEEK_END);
+    const int size = ftell(fd);
+    rewind(fd);
+    char *bytes = malloc(size);
+    fread(bytes, 1, size, fd);
+    fclose(fd);
+
+    dest->code = 200;
+    dest->content_len = size;
+    dest->content = bytes;
+    strcpy(dest->content_type, "image/x-icon");
 
     return 0;
 }
@@ -57,6 +75,12 @@ int main(int argc, char *argv[]) {
             .method = HTTP_METHOD_GET,
             .route_tmp = "/",
             .cb = home_callback,
+            .n_args = 0,
+        },
+        {
+            .method = HTTP_METHOD_GET,
+            .route_tmp = "/favicon.ico",
+            .cb = favicon_callback,
             .n_args = 0,
         },
     };
