@@ -12,6 +12,7 @@
 int home_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
     static const char home_resp[] = "<h1>Home page!</h1>";
 
+    dest->code = 200;
     dest->content_len = sizeof(home_resp);
     dest->content = malloc(dest->content_len);
     strcpy(dest->content_type, "text/html");

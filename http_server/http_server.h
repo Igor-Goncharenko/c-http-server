@@ -84,6 +84,8 @@ typedef struct {
 #define HS_CONTENT_TYPE_BUF_MAX 20
 
 typedef struct {
+    int                 code;
+
     char                content_type[HS_CONTENT_TYPE_BUF_MAX];
     char                *content;
     int                 content_len;

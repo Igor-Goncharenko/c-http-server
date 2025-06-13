@@ -90,10 +90,10 @@ HTTP_SERVER_STATIC http_server_err_t
 _process_route(server_route_t *route, const request_data_t *request, char **resp_dest, 
         int *resp_len) {
     static const char resp_fmt[] = 
-        "HTTP/1.1 200 OK\r\n"
+        "HTTP/1.1 %3d %s\r\n"
         "Content-Type: %s\r\n"
-        "Connection: close\r\n"
         "Content-Length: %d\r\n"
+        "Connection: close\r\n"
         "\r\n";
 
     http_server_err_e err_e = HTTP_SERVER_OK;
@@ -103,25 +103,35 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
 
     va_copy(args_cpy, route->args);
 
+
     if (route->cb(request, args_cpy, &resp) != 0) {
         err_e = HTTP_SERVER_ROUTE_ERR;
         goto cleanup;
     }
 
-    if ((*resp_dest = malloc(resp.content_len + sizeof(resp_fmt) + 256)) == NULL) {
+    const char *code_str = get_http_code_str(resp.code);
+    const int code_str_len = strlen(code_str);
+
+    *resp_dest = malloc(resp.content_len + code_str_len + sizeof(resp_fmt) + 256);
+    if (*resp_dest == NULL) {
         err_e = HTTP_SERVER_MALLOC_ERR;
         goto cleanup;
     }
-    if ((*resp_len = sprintf(*resp_dest, resp_fmt, resp.content_type, resp.content_len)) <= 0) {
+
+    *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type, 
+            resp.content_len);
+    if (*resp_len <= 0) {
         err_e = HTTP_SERVER_STDIO_ERR;
         goto cleanup;
     }
-    if (strcat(*resp_dest, resp.content) == NULL) {
-        err_e = HTTP_SERVER_STRCAT_ERR;
-        goto cleanup;
-    }
 
-    *resp_len += resp.content_len;
+    if (resp.content_len > 0) {
+        if (strcat(*resp_dest, resp.content) == NULL) {
+            err_e = HTTP_SERVER_STRCAT_ERR;
+            goto cleanup;
+        }
+        *resp_len += resp.content_len;
+    }
 
 cleanup:
     if (resp.content != NULL) free(resp.content);
