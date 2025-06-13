@@ -9,13 +9,13 @@
 
 #define n_routes 1
 
-int home_callback(const request_data_t *request, const va_list args, 
-        char **resp_dest, int *resp_len) {
+int home_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
     static const char home_resp[] = "<h1>Home page!</h1>";
 
-    *resp_len = sizeof(home_resp);
-    *resp_dest = malloc(*resp_len);
-    strcpy(*resp_dest, home_resp);
+    dest->content_len = sizeof(home_resp);
+    dest->content = malloc(dest->content_len);
+    strcpy(dest->content_type, "text/html");
+    strcpy(dest->content, home_resp);
 
     return 0;
 }
@@ -55,10 +55,6 @@ int main(int argc, char *argv[]) {
             .route_tmp = "/",
             .cb = home_callback,
             .n_args = 0,
-            .content_type = {
-                .type = HS_CONTENT_TYPE_TEXT,
-                .subtype.text = HS_SUBTYPE_TEXT_HTML,
-            },
         },
     };
 
