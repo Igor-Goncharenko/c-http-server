@@ -28,6 +28,46 @@ get_header(const request_data_t *request, const char *header) {
     return NULL;
 }
 
+HTTP_SERVER_API int 
+hs_response_add_header(hs_response_t *resp, const char *key, const char *value) {
+    const int key_len = strlen(key), value_len = strlen(value);
+    const int total_len = key_len + value_len + 4;  // 4: ": " + "\r\n" symbols
+
+    if (resp->headers.cap == 0) {
+        resp->headers.len = 0;
+        resp->headers.cap = 64;
+        resp->headers.data = malloc(resp->headers.cap);
+        if (resp->headers.data == NULL) return -1;
+    } else if (resp->headers.cap < resp->headers.len + total_len + 1) {
+        resp->headers.cap *= 2;
+        resp->headers.data = realloc(resp->headers.data, resp->headers.cap);
+        if (resp->headers.data == NULL) return -1;
+    }
+
+    if (    strcpy(resp->headers.data + resp->headers.len, key) == NULL ||
+            strcpy(resp->headers.data + resp->headers.len + key_len, ": ") == NULL ||
+            strcpy(resp->headers.data + resp->headers.len + key_len + 2, value) == NULL ||
+            strcpy(resp->headers.data + resp->headers.len + total_len - 2, "\r\n") == NULL)
+        return -2;
+
+    resp->headers.len += total_len;
+
+    return 0;
+}
+
+HTTP_SERVER_API void 
+hs_response_free(hs_response_t *resp) {
+    if (resp->headers.data != NULL && resp->headers.cap > 0) {
+        resp->headers.cap = 0;
+        resp->headers.len = 0;
+        free(resp->headers.data);
+    }
+    if (resp->content != NULL) {
+        resp->content_len = 0;
+        free(resp->content);
+    }
+}
+
 /*
  ********************************************
  *              CLIENT HANDLER              *

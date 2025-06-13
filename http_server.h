@@ -93,6 +93,12 @@ typedef struct {
     char                content_type[HS_CONTENT_TYPE_BUF_MAX];
     char                *content;
     int                 content_len;
+
+    struct {
+        char            *data;
+        int             len;
+        int             cap;
+    } headers;
 } hs_response_t;
 
 /*
@@ -156,6 +162,18 @@ server_destroy(server_t *self);
  */
 HTTP_SERVER_API const char*
 get_header(const request_data_t *request, const char *header);
+
+/**
+ *
+ */
+HTTP_SERVER_API int 
+hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
+
+/**
+ *
+ */
+HTTP_SERVER_API void 
+hs_response_free(hs_response_t *resp);
 
 #ifdef __cplusplus
 }
@@ -373,6 +391,46 @@ get_header(const request_data_t *request, const char *header) {
         if (strcmp(header, request->headers[i].key) == 0)
             return request->headers[i].value;
     return NULL;
+}
+
+HTTP_SERVER_API int 
+hs_response_add_header(hs_response_t *resp, const char *key, const char *value) {
+    const int key_len = strlen(key), value_len = strlen(value);
+    const int total_len = key_len + value_len + 4;  // 4: ": " + "\r\n" symbols
+
+    if (resp->headers.cap == 0) {
+        resp->headers.len = 0;
+        resp->headers.cap = 64;
+        resp->headers.data = malloc(resp->headers.cap);
+        if (resp->headers.data == NULL) return -1;
+    } else if (resp->headers.cap < resp->headers.len + total_len + 1) {
+        resp->headers.cap *= 2;
+        resp->headers.data = realloc(resp->headers.data, resp->headers.cap);
+        if (resp->headers.data == NULL) return -1;
+    }
+
+    if (    strcpy(resp->headers.data + resp->headers.len, key) == NULL ||
+            strcpy(resp->headers.data + resp->headers.len + key_len, ": ") == NULL ||
+            strcpy(resp->headers.data + resp->headers.len + key_len + 2, value) == NULL ||
+            strcpy(resp->headers.data + resp->headers.len + total_len - 2, "\r\n") == NULL)
+        return -2;
+
+    resp->headers.len += total_len;
+
+    return 0;
+}
+
+HTTP_SERVER_API void 
+hs_response_free(hs_response_t *resp) {
+    if (resp->headers.data != NULL && resp->headers.cap > 0) {
+        resp->headers.cap = 0;
+        resp->headers.len = 0;
+        free(resp->headers.data);
+    }
+    if (resp->content != NULL) {
+        resp->content_len = 0;
+        free(resp->content);
+    }
 }
 
 /*
@@ -1137,12 +1195,13 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
         "Content-Type: %s\r\n"
         "Content-Length: %d\r\n"
         "Connection: close\r\n"
+        "%s"
         "\r\n";
 
     http_server_err_e err_e = HTTP_SERVER_OK;
     const char *type_str, *subtype_str;
     va_list args_cpy;
-    hs_response_t resp;
+    hs_response_t resp = { 0 };
 
     va_copy(args_cpy, route->args);
 
@@ -1162,7 +1221,7 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
     }
 
     *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type, 
-            resp.content_len);
+            resp.content_len, (resp.headers.len <= 0) ? "" : resp.headers.data);
     if (*resp_len <= 0) {
         err_e = HTTP_SERVER_STDIO_ERR;
         goto cleanup;
@@ -1177,7 +1236,7 @@ _process_route(server_route_t *route, const request_data_t *request, char **resp
     }
 
 cleanup:
-    if (resp.content != NULL) free(resp.content);
+    hs_response_free(&resp);
     return HS_CREATE_ERR(err_e);
 }
 

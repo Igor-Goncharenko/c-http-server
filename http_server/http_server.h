@@ -89,6 +89,12 @@ typedef struct {
     char                content_type[HS_CONTENT_TYPE_BUF_MAX];
     char                *content;
     int                 content_len;
+
+    struct {
+        char            *data;
+        int             len;
+        int             cap;
+    } headers;
 } hs_response_t;
 
 /*
@@ -152,6 +158,18 @@ server_destroy(server_t *self);
  */
 HTTP_SERVER_API const char*
 get_header(const request_data_t *request, const char *header);
+
+/**
+ *
+ */
+HTTP_SERVER_API int 
+hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
+
+/**
+ *
+ */
+HTTP_SERVER_API void 
+hs_response_free(hs_response_t *resp);
 
 #ifdef __cplusplus
 }

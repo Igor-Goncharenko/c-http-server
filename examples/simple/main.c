@@ -18,6 +18,8 @@ int home_callback(const request_data_t *request, const va_list args, hs_response
     strcpy(dest->content_type, "text/html");
     strcpy(dest->content, home_resp);
 
+    hs_response_add_header(dest, "Test-header", "Test header value");
+
     return 0;
 }
 
