@@ -171,6 +171,12 @@ hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
 HTTP_SERVER_API void 
 hs_response_free(hs_response_t *resp);
 
+/**
+ *
+ */
+HTTP_SERVER_API size_t 
+hs_load_file(const char *filename, char **dest);
+
 #ifdef __cplusplus
 }
 #endif

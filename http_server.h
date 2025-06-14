@@ -175,6 +175,12 @@ hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
 HTTP_SERVER_API void 
 hs_response_free(hs_response_t *resp);
 
+/**
+ *
+ */
+HTTP_SERVER_API size_t 
+hs_load_file(const char *filename, char **dest);
+
 #ifdef __cplusplus
 }
 #endif
@@ -200,6 +206,7 @@ hs_response_free(hs_response_t *resp);
 #include <netinet/in.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 
 /* http_server/http_server_internal.h */
@@ -431,6 +438,43 @@ hs_response_free(hs_response_t *resp) {
         resp->content_len = 0;
         free(resp->content);
     }
+}
+
+HTTP_SERVER_API size_t 
+hs_load_file(const char *filename, char **dest) {
+    FILE *fd;
+    struct stat fd_stat;
+    char *buf = NULL;
+
+    if (stat(filename, &fd_stat)) {
+        LOG_ERROR("File not found: '%s'.", filename);
+        return -1;
+    }
+
+    if ((fd = fopen(filename, "rb")) == NULL) {
+        LOG_ERROR("Failed to open file '%s'.", filename);
+        return -1;
+    }
+
+    if ((buf = malloc(fd_stat.st_size + 1)) == NULL) {
+        LOG_ERROR("Memory allocation failed for file '%s'.", filename);
+        fclose(fd);
+        return -1;
+    }
+
+    size_t bytes_read = fread(buf, 1, fd_stat.st_size, fd);
+    if (bytes_read != fd_stat.st_size) {
+        LOG_ERROR("Read error for file '%s'.", filename);
+        free(buf);
+        fclose(fd);
+        return -1;
+    }
+
+    fclose(fd);
+
+    *dest = buf;
+
+    return fd_stat.st_size;
 }
 
 /*

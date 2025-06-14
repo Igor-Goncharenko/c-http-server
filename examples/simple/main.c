@@ -24,18 +24,9 @@ int home_callback(const request_data_t *request, const va_list args, hs_response
 }
 
 int favicon_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
-    const char file[] = "favicon.ico";
-    FILE *fd = fopen(file, "rb");
-    fseek(fd, 0, SEEK_END);
-    const int size = ftell(fd);
-    rewind(fd);
-    char *bytes = malloc(size);
-    fread(bytes, 1, size, fd);
-    fclose(fd);
+    if ((dest->content_len = hs_load_file("favicon.ico", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
-    dest->content_len = size;
-    dest->content = bytes;
     strcpy(dest->content_type, "image/x-icon");
 
     return 0;
