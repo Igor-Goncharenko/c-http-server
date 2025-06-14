@@ -7,18 +7,23 @@
 #include <signal.h>
 #include <string.h>
 
-#define n_routes 2
+#define n_routes 3
 
 int home_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
-    static const char home_resp[] = "<h1>Home page!</h1>";
+    if ((dest->content_len = hs_load_file("home.html", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
-    dest->content_len = sizeof(home_resp);
-    dest->content = malloc(dest->content_len);
     strcpy(dest->content_type, "text/html");
-    strcpy(dest->content, home_resp);
 
     hs_response_add_header(dest, "Test-header", "Test header value");
+
+    return 0;
+}
+
+int home_css_callback(const request_data_t *request, const va_list args, hs_response_t *dest) {
+    if ((dest->content_len = hs_load_file("home.css", &dest->content)) <= 0) return -1;
+    dest->code = 200;
+    strcpy(dest->content_type, "text/css");
 
     return 0;
 }
@@ -70,6 +75,12 @@ int main(int argc, char *argv[]) {
         },
         {
             .method = HTTP_METHOD_GET,
+            .route_tmp = "/home.css",
+            .cb = home_css_callback,
+            .n_args = 0,
+        },
+        {
+            .method = HTTP_METHOD_GET,
             .route_tmp = "/favicon.ico",
             .cb = favicon_callback,
             .n_args = 0,
@@ -88,4 +99,3 @@ int main(int argc, char *argv[]) {
 
     return EXIT_SUCCESS;
 }
-

@@ -237,7 +237,7 @@ _handle_client(const server_t *server, const int fd) {
     char *response = NULL;
     int response_len = 0;
 
-    fprintf(stdout, "New client: %d\n", fd);    // TODO: delete print
+    LOG_DEBUG("New client handled: %d.", fd);
 
     if (HS_ERROR_CHECK(err, _read_headers_raw(fd, &headers_raw)))
         goto cleanup;
@@ -246,7 +246,8 @@ _handle_client(const server_t *server, const int fd) {
         goto cleanup;
 
     int content_len = _get_content_len(&request);
-    printf("content_len = %d\n", content_len);  // TODO: delete print
+
+    LOG_DEBUG("Client %d: path=\"%s\".", fd, request.route);
 
     if (content_len > 0) {
         if (HS_ERROR_CHECK(err, _read_body(fd, &content_buf, content_len)))
