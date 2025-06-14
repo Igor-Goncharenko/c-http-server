@@ -11,34 +11,34 @@
 
 #define BUFFER_START_CAP    64
 
-HTTP_SERVER_LIB http_server_err_t
-buffer_init(buffer_t *self) {
+HS_LIB hs_err_t
+hs_buffer_init(hs_buffer_t *self) {
     if ((self->mem = malloc(BUFFER_START_CAP)) == NULL)
-        return HS_CREATE_ERR(HTTP_SERVER_MALLOC_ERR);
+        return HS_CREATE_ERR(HS_MALLOC_ERR);
     self->cap = BUFFER_START_CAP;
     self->len = 0;
     self->allow_realloc = false;
-    return HS_CREATE_ERR(HTTP_SERVER_OK);
+    return HS_CREATE_ERR(HS_OK);
 }
 
-HTTP_SERVER_LIB http_server_err_t 
-buffer_init_with_size(buffer_t *self, size_t size) {
+HS_LIB hs_err_t
+hs_buffer_init_with_size(hs_buffer_t *self, size_t size) {
     if ((self->mem = malloc(size)) == NULL)
-        return HS_CREATE_ERR(HTTP_SERVER_MALLOC_ERR);
+        return HS_CREATE_ERR(HS_MALLOC_ERR);
     self->cap = size;
     self->len = 0;
     self->allow_realloc = false;
-    return HS_CREATE_ERR(HTTP_SERVER_OK);
+    return HS_CREATE_ERR(HS_OK);
 }
 
-HTTP_SERVER_LIB http_server_err_t 
-buffer_append_mem(buffer_t *self, const int item_size, const int nitems, const void *src, 
+HS_LIB hs_err_t
+hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, const void *src, 
         void **beginning_ptr) {
     assert(!(SIZE_MAX / item_size < nitems));
     size_t add_size = item_size * nitems;
 
     if (add_size == 0)
-        return HS_CREATE_ERR(HTTP_SERVER_OK);
+        return HS_CREATE_ERR(HS_OK);
 
     assert(SIZE_MAX - self->len >= add_size);
     size_t new_size = self->len + add_size;
@@ -49,7 +49,7 @@ buffer_append_mem(buffer_t *self, const int item_size, const int nitems, const v
                     new_size, self->cap);
             fprintf(stderr, "%s\n", self->data);
             fflush(stderr);
-            return HS_CREATE_ERR(HTTP_SERVER_BUFFER_OVERFLOW_ERR);
+            return HS_CREATE_ERR(HS_BUFFER_OVERFLOW_ERR);
         }
 
         if (SIZE_MAX / 2 < new_size) {
@@ -59,22 +59,22 @@ buffer_append_mem(buffer_t *self, const int item_size, const int nitems, const v
                 self->cap *= 2;
         }
         if ((self->mem = realloc(self->mem, self->cap)) == NULL)
-            return HS_CREATE_ERR(HTTP_SERVER_MALLOC_ERR);
+            return HS_CREATE_ERR(HS_MALLOC_ERR);
     }
 
     if (src != NULL && memcpy(self->mem + self->len, src, add_size) == NULL)
-        return HS_CREATE_ERR(HTTP_SERVER_MEMCPY_ERR);
+        return HS_CREATE_ERR(HS_MEMCPY_ERR);
 
     if (beginning_ptr != NULL)
         *beginning_ptr = self->mem + self->len;
 
     self->len = new_size;
 
-    return HS_CREATE_ERR(HTTP_SERVER_OK);
+    return HS_CREATE_ERR(HS_OK);
 }
 
-HTTP_SERVER_LIB void 
-buffer_free(buffer_t *self) {
+HS_LIB void 
+hs_buffer_free(hs_buffer_t *self) {
     if (self != NULL) {
         if (self->mem != NULL) 
             free(self->mem);
@@ -84,25 +84,25 @@ buffer_free(buffer_t *self) {
     }
 }
 
-HTTP_SERVER_LIB http_server_err_t
-buffer_append_sentence(buffer_t *self, const char *sentence, const size_t sentence_len, 
+HS_LIB hs_err_t
+hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len, 
         char **beginning_ptr) {
-    http_server_err_t err;
-    if (HS_ERROR_CHECK(err, buffer_append_mem(self, 1, sentence_len, sentence, NULL)))
+    hs_err_t err;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, 1, sentence_len, sentence, NULL)))
         return err;
-    if (HS_ERROR_CHECK(err, buffer_append_mem(self, 1, 1, "\0", NULL)))
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, 1, 1, "\0", NULL)))
         return err;
     if (beginning_ptr != NULL)
         *beginning_ptr = self->data + self->len - sentence_len - 1;
-    return HS_CREATE_ERR(HTTP_SERVER_OK);
+    return HS_CREATE_ERR(HS_OK);
 }
 
-HTTP_SERVER_LIB http_server_err_t
-buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr) {
-    http_server_err_t err;
-    if (HS_ERROR_CHECK(err, buffer_append_mem(self, other->len, 1, other->mem, NULL)))
+HS_LIB hs_err_t
+hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other, void **beginning_ptr) {
+    hs_err_t err;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, other->len, 1, other->mem, NULL)))
         return err;
     if (beginning_ptr != NULL)
         *beginning_ptr = self->mem + self->len - other->len;
-    return HS_CREATE_ERR(HTTP_SERVER_OK);
+    return HS_CREATE_ERR(HS_OK);
 }

@@ -15,13 +15,13 @@ extern "C" {
 #include <netinet/in.h>
 #include <sys/epoll.h>
 
-#define HTTP_SERVER_API         extern
-#define HTTP_SERVER_STATIC      static
-#ifdef HTTP_SERVER_SINGLE_FILE
-# define HTTP_SERVER_LIB        static
+#define HS_API extern
+#define HS_STATIC static
+#ifdef HS_SINGLE_FILE
+# define HS_LIB static
 #else
-# define HTTP_SERVER_LIB        extern
-#endif /* HTTP_SERVER_SINGLE_FILE */
+# define HS_LIB extern
+#endif /* HS_SINGLE_FILE */
 
 /*
  ********************************************
@@ -35,26 +35,26 @@ typedef struct {
 
     char            *value;
     int             value_len;
-} header_t;
+} hs_header_t;
 
-#define HTTP_VERSION_LAST   HTTP_VERSION_UNKNOWN
+#define HS_VERSION_LAST (HS_VERSION_UNKNOWN)
 typedef enum {
-    HTTP_VERSION_1_1 = 0,
-    HTTP_VERSION_UNKNOWN
-} http_version_e;
+    HS_VERSION_1_1 = 0,
+    HS_VERSION_UNKNOWN
+} hs_http_version_e;
 
-#define HTTP_METHOD_LAST    HTTP_METHOD_UNKNOWN
+#define HS_METHOD_LAST (HS_METHOD_UNKNOWN)
 typedef enum {
-    HTTP_METHOD_GET = 0,
-    HTTP_METHOD_HEAD,
-    HTTP_METHOD_POST,
-    HTTP_METHOD_PUT,
-    HTTP_METHOD_DELETE,
-    HTTP_METHOD_CONNECT,
-    HTTP_METHOD_OPTIONS,
-    HTTP_METHOD_TRACE,
-    HTTP_METHOD_UNKNOWN,
-} http_method_e;
+    HS_METHOD_GET = 0,
+    HS_METHOD_HEAD,
+    HS_METHOD_POST,
+    HS_METHOD_PUT,
+    HS_METHOD_DELETE,
+    HS_METHOD_CONNECT,
+    HS_METHOD_OPTIONS,
+    HS_METHOD_TRACE,
+    HS_METHOD_UNKNOWN,
+} hs_http_method_e;
 
 typedef struct {
     char                *mem;
@@ -62,17 +62,17 @@ typedef struct {
 
     time_t              time;
 
-    http_method_e       method;
+    hs_http_method_e       method;
     char                *route;
-    http_version_e      version;
+    hs_http_version_e      version;
     int                 code;
 
-    header_t            *headers;
+    hs_header_t            *headers;
     int                 n_headers;
 
     char                *content;
     size_t              content_len;
-} request_data_t;
+} hs_request_data_t;
 
 
 /*
@@ -103,15 +103,15 @@ typedef struct {
  ********************************************
  */
 
-typedef int (*route_callback)(const request_data_t*, const va_list, hs_response_t*);
+typedef int (*hs_route_callback)(const hs_request_data_t*, const va_list, hs_response_t*);
 
 typedef struct {
-    http_method_e       method;
+    hs_http_method_e       method;
     char                *route_tmp;
-    route_callback      cb;
+    hs_route_callback      cb;
     va_list             args;
     int                 n_args;
-} server_route_t;
+} hs_server_route_t;
 
 typedef struct {
     void                *mem;
@@ -124,9 +124,9 @@ typedef struct {
 
     bool                running;
 
-    server_route_t      *routes;
+    hs_server_route_t      *routes;
     int                 n_routes;
-} server_t;
+} hs_server_t;
 
 /*
  ********************************************
@@ -137,44 +137,44 @@ typedef struct {
 /**
  *
  */
-HTTP_SERVER_API int
-init_server(server_t *self, const int port, const int to_listen, const server_route_t *routes, 
+HS_API int
+hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_server_route_t *routes, 
         const int n_routes);
 
 /**
  *
  */
-HTTP_SERVER_API int
-start_server(server_t *self);
+HS_API int
+hs_start_server(hs_server_t *self);
 
 /**
  *
  */
-HTTP_SERVER_API void 
-server_destroy(server_t *self);
+HS_API void 
+hs_server_destroy(hs_server_t *self);
 
 /**
  *
  */
-HTTP_SERVER_API const char*
-get_header(const request_data_t *request, const char *header);
+HS_API const char*
+hs_get_header(const hs_request_data_t *request, const char *header);
 
 /**
  *
  */
-HTTP_SERVER_API int 
+HS_API int 
 hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
 
 /**
  *
  */
-HTTP_SERVER_API void 
+HS_API void 
 hs_response_free(hs_response_t *resp);
 
 /**
  *
  */
-HTTP_SERVER_API size_t 
+HS_API size_t 
 hs_load_file(const char *filename, char **dest);
 
 #ifdef __cplusplus
