@@ -1,43 +1,33 @@
 #include "http_server_internal.h"
 
 #include <assert.h>
-#include <stdlib.h>
 
-HTTP_SERVER_LIB const char*
-hs_strerror(http_server_err_e err) {
+HS_LIB const char*
+hs_strerror(hs_err_e err) {
     static const char *hs_error_str[] = {
-        [HTTP_SERVER_OK]                    = "Ok",
+        [HS_OK]                    = "Ok",
+        [HS_ROUTE_ERR]             = "Route_err",
         /* General */
-        [HTTP_SERVER_MALLOC_ERR]            = "Malloc_err",
+        [HS_MALLOC_ERR]            = "Malloc_err",
+        [HS_STDIO_ERR]             = "Stdio_err",
         /* string errors */
-        [HTTP_SERVER_STRTOK_ERR]            = "Strtok_err",
-        [HTTP_SERVER_STRCPY_ERR]            = "Strcpy_err",
-        [HTTP_SERVER_STRCAT_ERR]            = "Strcat_err",
-        [HTTP_SERVER_MEMCPY_ERR]            = "Memcpy_err",
-        [HTTP_SERVER_MEMSET_ERR]            = "Memset_err",
+        [HS_STRTOK_ERR]            = "Strtok_err",
+        [HS_STRCPY_ERR]            = "Strcpy_err",
+        [HS_STRCAT_ERR]            = "Strcat_err",
+        [HS_MEMCPY_ERR]            = "Memcpy_err",
+        [HS_MEMSET_ERR]            = "Memset_err",
         /* Server init errors */
-        [HTTP_SERVER_SOCKET_CREATE_ERR]     = "Socket_create_err",
-        [HTTP_SERVER_BIND_ERR]              = "Bind_err",
-        [HTTP_SERVER_LISTEN_ERR]            = "Listen_err",
-        [HTTP_SERVER_EPOLL_CREATE_ERR]      = "Epoll_create_err",
-        [HTTP_SERVER_EPOLL_CTL_ERR]         = "Epoll_ctl_err",
+        [HS_SOCKET_CREATE_ERR]     = "Socket_create_err",
+        [HS_BIND_ERR]              = "Bind_err",
+        [HS_LISTEN_ERR]            = "Listen_err",
+        [HS_EPOLL_CREATE_ERR]      = "Epoll_create_err",
+        [HS_EPOLL_CTL_ERR]         = "Epoll_ctl_err",
+        [HS_WRITE_ERR]             = "Write_err",
         /* Socket errors */
-        [HTTP_SERVER_SOCKET_READ_ERR]       = "Socket_read_err",
+        [HS_SOCKET_READ_ERR]       = "Socket_read_err",
         /* buffer errors */
-        [HTTP_SERVER_BUFFER_OVERFLOW_ERR]   = "Buffer_overflow_err",
+        [HS_BUFFER_OVERFLOW_ERR]   = "Buffer_overflow_err",
     };
 
-    assert(err > sizeof(hs_error_str) / 8);
-
-    const char *res = hs_error_str[err];
-
-    if (res == NULL) {
-        LOG_ERROR("Error with code %d not set", err);
-        exit(EXIT_FAILURE);
-    }
-
-    return res;
+    return hs_error_str[err];
 }
-
-
-

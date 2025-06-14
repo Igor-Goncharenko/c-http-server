@@ -14,51 +14,54 @@
  */
 
 typedef enum {
-    HTTP_SERVER_OK = 0,
+    HS_OK = 0,
+    HS_ROUTE_ERR,
     /* General */
-    HTTP_SERVER_MALLOC_ERR,
+    HS_MALLOC_ERR,
+    HS_STDIO_ERR,
     /* string errors */
-    HTTP_SERVER_STRTOK_ERR,
-    HTTP_SERVER_STRCPY_ERR,
-    HTTP_SERVER_STRCAT_ERR,
-    HTTP_SERVER_MEMCPY_ERR,
-    HTTP_SERVER_MEMSET_ERR,
+    HS_STRTOK_ERR,
+    HS_STRCPY_ERR,
+    HS_STRCAT_ERR,
+    HS_MEMCPY_ERR,
+    HS_MEMSET_ERR,
     /* Server init errors */
-    HTTP_SERVER_SOCKET_CREATE_ERR,
-    HTTP_SERVER_BIND_ERR,
-    HTTP_SERVER_LISTEN_ERR,
-    HTTP_SERVER_EPOLL_CREATE_ERR,
-    HTTP_SERVER_EPOLL_CTL_ERR,
+    HS_SOCKET_CREATE_ERR,
+    HS_BIND_ERR,
+    HS_LISTEN_ERR,
+    HS_EPOLL_CREATE_ERR,
+    HS_EPOLL_CTL_ERR,
+    HS_WRITE_ERR,
     /* Socket errors */
-    HTTP_SERVER_SOCKET_READ_ERR,
+    HS_SOCKET_READ_ERR,
     /* buffer errors */
-    HTTP_SERVER_BUFFER_OVERFLOW_ERR,
-} http_server_err_e;
+    HS_BUFFER_OVERFLOW_ERR,
+} hs_err_e;
 
 typedef struct {
-    http_server_err_e code;
+    hs_err_e code;
     int             errno_;
     int             line;
-} http_server_err_t;
+} hs_err_t;
 
-HTTP_SERVER_LIB const char*
-hs_strerror(http_server_err_e err);
+HS_LIB const char*
+hs_strerror(hs_err_e err);
 
 #define HS_STATIC_ASSERT(expr) typedef char static_assert_##__LINE__[(expr) ? 1 : -1]
 
-#define HS_ERROR_CHECK(_hs_err_var_t, _hs_function)                                     \
-    ({                                                                                  \
-        HS_STATIC_ASSERT(                                                               \
-                __builtin_types_compatible_p(typeof(_hs_function), http_server_err_t)); \
-        http_server_err_t _hs_err_tmp = (_hs_function);                                 \
-        (_hs_err_var_t) = _hs_err_tmp;                                                  \
-        (_hs_err_var_t.code != HTTP_SERVER_OK);                                         \
+#define HS_ERROR_CHECK(_hs_err_var_t, _hs_function)                             \
+    ({                                                                          \
+        HS_STATIC_ASSERT(                                                       \
+                __builtin_types_compatible_p(typeof(_hs_function), hs_err_t));  \
+        hs_err_t _hs_err_tmp = (_hs_function);                                  \
+        (_hs_err_var_t) = _hs_err_tmp;                                          \
+        (_hs_err_var_t.code != HS_OK);                                          \
     })
 
 #define HS_CREATE_ERR(_err_e)           \
     ({                                  \
         int _saved_errno = errno;       \
-        (http_server_err_t){            \
+        (hs_err_t){                     \
             .code = (_err_e),           \
             .line = __LINE__,           \
             .errno_ = _saved_errno,     \
@@ -77,22 +80,22 @@ hs_strerror(http_server_err_e err);
  */
 
 typedef enum {
-    LOG_LEVEL_TRACE = 0,
-    LOG_LEVEL_DEBUG,
-    LOG_LEVEL_INFO,
-    LOG_LEVEL_WARN,
-    LOG_LEVEL_ERROR,
+    HS_LOG_LEVEL_TRACE = 0,
+    HS_LOG_LEVEL_DEBUG,
+    HS_LOG_LEVEL_INFO,
+    HS_LOG_LEVEL_WARN,
+    HS_LOG_LEVEL_ERROR,
 } log_level_e;
 
-HTTP_SERVER_LIB void 
-log_log(const log_level_e level, const int line, const char *file, const char *func, 
+HS_LIB void 
+hs_log_log(const log_level_e level, const int line, const char *file, const char *func, 
         const char *fmt, ...);
 
-#define LOG_TRACE(...)  log_log(LOG_LEVEL_TRACE, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
-#define LOG_DEBUG(...)  log_log(LOG_LEVEL_DEBUG, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
-#define LOG_INFO(...)   log_log(LOG_LEVEL_INFO, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
-#define LOG_WARN(...)   log_log(LOG_LEVEL_WARN, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
-#define LOG_ERROR(...)  log_log(LOG_LEVEL_ERROR, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_TRACE(...) hs_log_log(HS_LOG_LEVEL_TRACE, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_DEBUG(...) hs_log_log(HS_LOG_LEVEL_DEBUG, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_INFO(...) hs_log_log(HS_LOG_LEVEL_INFO, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_WARN(...) hs_log_log(HS_LOG_LEVEL_WARN, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
+#define LOG_ERROR(...) hs_log_log(HS_LOG_LEVEL_ERROR, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
 
 /*
  ********************************************
@@ -109,36 +112,36 @@ typedef struct {
     size_t              cap;
 
     bool                allow_realloc;
-} buffer_t;
+} hs_buffer_t;
 
 /** @brief Inits buffer structure */
-HTTP_SERVER_LIB http_server_err_t 
-buffer_init(buffer_t *self);
+HS_LIB hs_err_t 
+hs_buffer_init(hs_buffer_t *self);
 
 /** @brief Inits buffer with set size */
-HTTP_SERVER_LIB http_server_err_t 
-buffer_init_with_size(buffer_t *self, size_t size);
+HS_LIB hs_err_t 
+hs_buffer_init_with_size(hs_buffer_t *self, size_t size);
 
 /**
  * @brief Appends `nitems` with size `item_size` from `src` to buffer.
  * @warning This function may throw Assertion if `size_t` max limit reached.
  */
-HTTP_SERVER_LIB http_server_err_t 
-buffer_append_mem(buffer_t *self, const int item_size, const int nitems, const void *src,
+HS_LIB hs_err_t 
+hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, const void *src,
         void **beginning_ptr);
 
 /** @brief Frees mem from buffer structure and sets cap and len to zero */
-HTTP_SERVER_LIB void 
-buffer_free(buffer_t *self);
+HS_LIB void 
+hs_buffer_free(hs_buffer_t *self);
 
 /**  */
-HTTP_SERVER_LIB http_server_err_t
-buffer_append_sentence(buffer_t *self, const char *sentence, const size_t sentence_len, 
+HS_LIB hs_err_t
+hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len, 
         char **beginning_ptr);
 
 /**  */
-HTTP_SERVER_LIB http_server_err_t
-buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr);
+HS_LIB hs_err_t
+hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other, void **beginning_ptr);
 
 
 /*
@@ -147,7 +150,24 @@ buffer_join_buffer(buffer_t *self, const buffer_t *other, void **beginning_ptr);
  ********************************************
  */
 
-HTTP_SERVER_LIB http_server_err_t
-parse_http_request(request_data_t *dest, buffer_t *headers_raw);
+HS_LIB hs_err_t
+hs_parse_http_request(hs_request_data_t *dest, hs_buffer_t *headers_raw);
+
+
+/*
+ ********************************************
+ *              HTTP RESPONSE               *
+ ********************************************
+ */
+
+HS_LIB const char*
+hs_get_http_code_str(const int code);
+
+HS_LIB hs_err_t 
+hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest, 
+        int *resp_len);
+
+HS_LIB hs_err_t 
+hs_create_error_response(char **dest, int *dest_size, const int code);
 
 #endif /* HTTP_SERVER_INTERNAL_H_ */

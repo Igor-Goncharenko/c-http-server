@@ -75,8 +75,7 @@ def print_pub(pub_file: str) -> str:
         return fd.read()
 
 
-def remove_includes(files: List[str], file_source: str
-                    ) -> Tuple[str, List[str]]:
+def remove_includes(files: List[str], file_source: str) -> Tuple[str, List[str]]:
     """."""
     result_str: str = file_source
     # delete local includes
@@ -86,10 +85,11 @@ def remove_includes(files: List[str], file_source: str
             result_str = result_str.replace(f"#include \"{fname}\"\n", "")
             result_str = result_str.replace(f"#include <{fname}>\n", "")
     # delete standard library includes
-    stdlib_inc = re.findall(r"#include <[a-zA-Z_][a-zA-Z0-9_/]*\.h>\n", result_str)
-    stdlib_inc += re.findall(r"#include \"[a-zA-Z_][a-zA-Z0-9_/]*\.h\"\n", result_str)
+    stdlib_inc = re.findall(r"#include <[a-zA-Z_][a-zA-Z0-9_/]*\.h>\s*", result_str)
+    stdlib_inc += re.findall(r"#include \"[a-zA-Z_][a-zA-Z0-9_/]*\.h\"\s*", result_str)
     for inc in stdlib_inc:
         result_str = result_str.replace(inc, "")
+    stdlib_inc = list(map(lambda x: x.strip() + "\n", stdlib_inc))
 
     return result_str, stdlib_inc
 
@@ -110,11 +110,10 @@ def format_private_n_src_files(pub: str, private: List[str], source: List[str]) 
     for file in priv_src:
         with open(file, "r") as fd:
             file_src = fd.read()
-            file_without_includes, stdlib_inc = \
-                    remove_includes(all_files, file_src)
-
+            file_without_includes, stdlib_inc = remove_includes(all_files, file_src)
             stdlib_includes.update(stdlib_inc)
-            result += file_without_includes
+            src_header = f"\n/* {file} */\n"
+            result += src_header + file_without_includes
 
     sorted_includes = sort_includes(stdlib_includes)
     result = "".join(sorted_includes) + "\n" + result

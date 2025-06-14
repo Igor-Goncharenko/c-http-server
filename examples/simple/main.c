@@ -7,23 +7,40 @@
 #include <signal.h>
 #include <string.h>
 
-#define n_routes 1
+#define n_routes 3
 
-int home_callback(const request_data_t *request, const va_list args, 
-        char **resp_dest, int *resp_len) {
-    static const char home_resp[] = "<h1>Home page!</h1>";
+int home_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+    if ((dest->content_len = hs_load_file("home.html", &dest->content)) <= 0) return -1;
 
-    *resp_len = sizeof(home_resp);
-    *resp_dest = malloc(*resp_len);
-    strcpy(*resp_dest, home_resp);
+    dest->code = 200;
+    strcpy(dest->content_type, "text/html");
+
+    hs_response_add_header(dest, "Test-header", "Test header value");
 
     return 0;
 }
 
-server_t server;
+int home_css_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+    if ((dest->content_len = hs_load_file("home.css", &dest->content)) <= 0) return -1;
+    dest->code = 200;
+    strcpy(dest->content_type, "text/css");
+
+    return 0;
+}
+
+int favicon_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+    if ((dest->content_len = hs_load_file("favicon.ico", &dest->content)) <= 0) return -1;
+
+    dest->code = 200;
+    strcpy(dest->content_type, "image/x-icon");
+
+    return 0;
+}
+
+hs_server_t server;
 
 void cleanup(void) {
-    server_destroy(&server);
+    hs_server_destroy(&server);
 }
 
 void handle_sigint(int sig) {
@@ -49,25 +66,36 @@ int main(int argc, char *argv[]) {
     atexit(cleanup);
     setup_signal_handler();
 
-    const server_route_t routes[n_routes] = {
+    const hs_server_route_t routes[n_routes] = {
         {
-            .method = HTTP_METHOD_GET,
+            .method = HS_METHOD_GET,
             .route_tmp = "/",
             .cb = home_callback,
             .n_args = 0,
         },
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/home.css",
+            .cb = home_css_callback,
+            .n_args = 0,
+        },
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/favicon.ico",
+            .cb = favicon_callback,
+            .n_args = 0,
+        },
     };
 
-    if (init_server(&server, 8080, 10, routes, n_routes) != 0) {
+    if (hs_init_server(&server, 8080, 10, routes, n_routes) != 0) {
         fprintf(stderr, "Failed to init server\n");
         exit(EXIT_FAILURE);
     }
 
-    if (start_server(&server) != 0) {
+    if (hs_start_server(&server) != 0) {
         fprintf(stderr, "Failed to start server\n");
         exit(EXIT_FAILURE);
     }
 
     return EXIT_SUCCESS;
 }
-

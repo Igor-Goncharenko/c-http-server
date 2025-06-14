@@ -1,5 +1,5 @@
 CC = clang
-CFLAGS = -std=gnu99 -DHTTP_SERVER_IMPLEMENTATION
+CFLAGS = -std=gnu99 -DHS_IMPLEMENTATION
 CFLAGS += -O0 -g
 
 SRC = main.c
@@ -13,7 +13,7 @@ compile:
 	$(CC) $(CFLAGS) -o $(OUT) $(SRC)
 
 debug:
-	gdb ./$(OUT)
+	gdb -tui ./$(OUT)
 
 clean:
 	rm -f $(OUT)

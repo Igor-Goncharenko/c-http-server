@@ -6,24 +6,24 @@
 
 static const char
 *_level_strings[] = {
-    [LOG_LEVEL_TRACE] = "TRACE",
-    [LOG_LEVEL_DEBUG] = "DEBUG",
-    [LOG_LEVEL_INFO]  = "INFO",
-    [LOG_LEVEL_WARN]  = "WARN",
-    [LOG_LEVEL_ERROR] = "ERROR",
+    [HS_LOG_LEVEL_TRACE] = "TRACE",
+    [HS_LOG_LEVEL_DEBUG] = "DEBUG",
+    [HS_LOG_LEVEL_INFO]  = "INFO",
+    [HS_LOG_LEVEL_WARN]  = "WARN",
+    [HS_LOG_LEVEL_ERROR] = "ERROR",
 };
 
 static const int 
 _level_colors[] = {
-    [LOG_LEVEL_TRACE] = 39,     /* default terminal color */
-    [LOG_LEVEL_DEBUG] = 37,     /* white */
-    [LOG_LEVEL_INFO]  = 32,     /* green */
-    [LOG_LEVEL_WARN]  = 33,     /* yellow */
-    [LOG_LEVEL_ERROR] = 31,     /* red */
+    [HS_LOG_LEVEL_TRACE] = 39,     /* default terminal color */
+    [HS_LOG_LEVEL_DEBUG] = 37,     /* white */
+    [HS_LOG_LEVEL_INFO]  = 32,     /* green */
+    [HS_LOG_LEVEL_WARN]  = 33,     /* yellow */
+    [HS_LOG_LEVEL_ERROR] = 31,     /* red */
 };
 
-HTTP_SERVER_LIB void 
-log_log(const log_level_e level, const int line, const char *file, const char *func, 
+HS_LIB void 
+hs_log_log(const log_level_e level, const int line, const char *file, const char *func, 
         const char *fmt, ...) {
     char time_buf[16], date_buf[16];
     va_list args;
@@ -43,4 +43,3 @@ log_log(const log_level_e level, const int line, const char *file, const char *f
 
     va_end(args);
 }
-
