@@ -1,6 +1,7 @@
 #include "http_server.h"
 #include "http_server_internal.h"
 
+#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,25 +67,14 @@ get_http_code_str(const int code) {
 
 HS_STATIC hs_server_route_t* 
 _find_route(const hs_server_t *server, const hs_request_data_t *request) {
-    hs_server_route_t *found_route = NULL;
-    va_list args_cpy;
-
     for (int i = 0; i < server->n_routes; i++) {
         hs_server_route_t *route = &server->routes[i];
-        // if (route->n_args > 0) {
-        //     va_copy(args_cpy, route->args);
-        //     if (vsscanf(request->route, route->route_tmp, args_cpy) == route->n_args) {
-        //         found_route = route;
-        //         break;
-        //     }
-        //} else 
-        if (strcmp(route->route_tmp, request->route) == 0) {
-            found_route = route;
-            break;
+        if (    request->method == route->method && 
+                regexec(&route->_re, request->route, 0, NULL, 0) == 0) {
+            return route;
         }
     }
-
-    return found_route;
+    return NULL;
 }
 
 HS_STATIC hs_err_t
