@@ -50,7 +50,8 @@ static const char *HTTP_CODE_STR[] = {
     [505] = "HTTP VERSION NOT SUPPORTED",
 };
 
-HS_LIB const char *get_http_code_str(const int code) {
+HS_LIB const char *
+get_http_code_str(const int code) {
     if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8) return "UNKNOWN";
     const char *res = HTTP_CODE_STR[code];
     return (res != NULL) ? res : "UNKNOWN";
@@ -62,8 +63,8 @@ HS_LIB const char *get_http_code_str(const int code) {
  ********************************************
  */
 
-HS_STATIC hs_server_route_t *_find_route(const hs_server_t *server,
-                                         const hs_request_data_t *request) {
+HS_STATIC hs_server_route_t *
+_find_route(const hs_server_t *server, const hs_request_data_t *request) {
     for (int i = 0; i < server->n_routes; i++) {
         hs_server_route_t *route = &server->routes[i];
         if (request->method == route->method &&
@@ -74,8 +75,9 @@ HS_STATIC hs_server_route_t *_find_route(const hs_server_t *server,
     return NULL;
 }
 
-HS_STATIC hs_err_t _hs_parse_route_matches(const hs_request_data_t *req,
-                                           const hs_server_route_t *route, char ***matches) {
+HS_STATIC hs_err_t
+_hs_parse_route_matches(const hs_request_data_t *req, const hs_server_route_t *route,
+                        char ***matches) {
     hs_err_t err;
     hs_buffer_t buf;
     regmatch_t *rematches;
@@ -106,8 +108,9 @@ failed:
     return err;
 }
 
-HS_STATIC hs_err_t _process_route(hs_server_route_t *route, const hs_request_data_t *request,
-                                  char **resp_dest, int *resp_len) {
+HS_STATIC hs_err_t
+_process_route(hs_server_route_t *route, const hs_request_data_t *request, char **resp_dest,
+               int *resp_len) {
     static const char resp_fmt[] =
         "HTTP/1.1 %3d %s\r\n"
         "Content-Type: %s\r\n"
@@ -162,8 +165,9 @@ cleanup:
     return err;
 }
 
-HS_LIB hs_err_t hs_form_response(const hs_server_t *server, const hs_request_data_t *request,
-                                 char **resp_dest, int *resp_len) {
+HS_LIB hs_err_t
+hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest,
+                 int *resp_len) {
     hs_err_t err;
     hs_server_route_t *found_route = _find_route(server, request);
 
@@ -210,7 +214,8 @@ static const char ERROR_PAGE_BODY[] =
     "</body>"
     "</html>";
 
-HS_LIB hs_err_t hs_create_error_response(char **dest, int *dest_size, const int code) {
+HS_LIB hs_err_t
+hs_create_error_response(char **dest, int *dest_size, const int code) {
     hs_err_e err_e;
 
     *dest = NULL;

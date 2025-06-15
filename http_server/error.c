@@ -2,7 +2,8 @@
 
 #include "http_server_internal.h"
 
-HS_LIB const char *hs_strerror(hs_err_e err) {
+HS_LIB const char *
+hs_strerror(hs_err_e err) {
     static const char *hs_error_str[] = {
         [HS_OK] = "Ok",
         [HS_ROUTE_ERR] = "Route_err",

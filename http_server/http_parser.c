@@ -14,7 +14,8 @@ static const char *HTTP_METHODS_STR[] = {
     [HS_METHOD_OPTIONS] = "OPTIONS", [HS_METHOD_TRACE] = "TRACE",
 };
 
-HS_STATIC hs_http_version_e _hs_parse_http_version(const char *version_str) {
+HS_STATIC hs_http_version_e
+_hs_parse_http_version(const char *version_str) {
     if (version_str == NULL) return HS_VERSION_UNKNOWN;
 
     for (int i = 0; i < HS_VERSION_LAST; i++)
@@ -23,7 +24,8 @@ HS_STATIC hs_http_version_e _hs_parse_http_version(const char *version_str) {
     return HS_VERSION_UNKNOWN;
 }
 
-HS_STATIC hs_http_method_e _hs_parse_http_method(const char *method_str) {
+HS_STATIC hs_http_method_e
+_hs_parse_http_method(const char *method_str) {
     if (method_str == NULL) return HS_METHOD_UNKNOWN;
 
     for (int i = 0; i < HS_METHOD_LAST; i++)
@@ -32,7 +34,8 @@ HS_STATIC hs_http_method_e _hs_parse_http_method(const char *method_str) {
     return HS_METHOD_UNKNOWN;
 }
 
-HS_STATIC hs_err_t _hs_parse_request_line(hs_request_data_t *dest, hs_buffer_t *buf, char *line) {
+HS_STATIC hs_err_t
+_hs_parse_request_line(hs_request_data_t *dest, hs_buffer_t *buf, char *line) {
     char *save_ptr, *token;
     hs_err_t err;
 
@@ -50,14 +53,16 @@ HS_STATIC hs_err_t _hs_parse_request_line(hs_request_data_t *dest, hs_buffer_t *
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_STATIC int _hs_count_raw_lines(hs_buffer_t *headers_raw) {
+HS_STATIC int
+_hs_count_raw_lines(hs_buffer_t *headers_raw) {
     int counter = 1;
     for (int i = 0; i < headers_raw->len; i++)
         if (headers_raw->data[i] == '\n') counter++;
     return counter;
 }
 
-HS_STATIC hs_err_t _hs_parse_header(hs_header_t *dest, hs_buffer_t *buf, char *line) {
+HS_STATIC hs_err_t
+_hs_parse_header(hs_header_t *dest, hs_buffer_t *buf, char *line) {
     hs_err_t err;
 
     char *delim_ptr = strchr(line, ':');
@@ -77,7 +82,8 @@ HS_STATIC hs_err_t _hs_parse_header(hs_header_t *dest, hs_buffer_t *buf, char *l
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_LIB hs_err_t hs_parse_http_request(hs_request_data_t *dest, hs_buffer_t *headers_raw) {
+HS_LIB hs_err_t
+hs_parse_http_request(hs_request_data_t *dest, hs_buffer_t *headers_raw) {
     hs_err_t err = HS_CREATE_ERR(HS_OK);
     hs_buffer_t req_buf;
     char *save_ptr, *token;

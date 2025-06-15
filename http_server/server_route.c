@@ -21,7 +21,8 @@ static const char *HS_FORMAT_REGEX[] = {
     [HS_FORMAT_TYPE_INT] = "[[:digit:]]+",
 };
 
-HS_STATIC const char *_hs_find_user_str(const char *str, const int len) {
+HS_STATIC const char *
+_hs_find_user_str(const char *str, const int len) {
     for (int i = 0; i <= HS_FORMAT_TYPE_LAST; i++) {
         if (strncmp(str, HS_FORMAT_USER_STR[i], len) == 0) {
             return HS_FORMAT_REGEX[i];
@@ -30,7 +31,8 @@ HS_STATIC const char *_hs_find_user_str(const char *str, const int len) {
     return NULL;
 }
 
-HS_STATIC bool _hs_should_escape(const char ch) {
+HS_STATIC bool
+_hs_should_escape(const char ch) {
     static const char TO_ESCAPE[] = {'.', '^', '$', '*', '+', '?', '{',
                                      '}', '[', ']', '(', ')', '`', '\\'};
 
@@ -40,7 +42,8 @@ HS_STATIC bool _hs_should_escape(const char ch) {
     return false;
 }
 
-HS_STATIC hs_err_t _hs_escape_char_and_add(const char *str, const int len, hs_buffer_t *buf) {
+HS_STATIC hs_err_t
+_hs_escape_char_and_add(const char *str, const int len, hs_buffer_t *buf) {
     hs_err_t err;
     for (int i = 0; i < len; i++) {
         if (_hs_should_escape(str[i])) {
@@ -51,7 +54,8 @@ HS_STATIC hs_err_t _hs_escape_char_and_add(const char *str, const int len, hs_bu
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_STATIC hs_err_t _hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
+HS_STATIC hs_err_t
+_hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
     hs_err_t err;
     hs_buffer_t buf;
     int last_c = 0;
@@ -104,8 +108,9 @@ failed:
     return err;
 }
 
-HS_LIB hs_err_t hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
-                                             const int n_routes) {
+HS_LIB hs_err_t
+hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
+                             const int n_routes) {
     hs_err_t err;
     hs_buffer_t buf = {0};
     char *route_re = NULL;

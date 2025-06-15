@@ -11,7 +11,8 @@
 
 #define BUFFER_START_CAP 64
 
-HS_LIB hs_err_t hs_buffer_init(hs_buffer_t *self) {
+HS_LIB hs_err_t
+hs_buffer_init(hs_buffer_t *self) {
     if ((self->mem = malloc(BUFFER_START_CAP)) == NULL) return HS_CREATE_ERR(HS_MALLOC_ERR);
     self->cap = BUFFER_START_CAP;
     self->len = 0;
@@ -19,7 +20,8 @@ HS_LIB hs_err_t hs_buffer_init(hs_buffer_t *self) {
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_LIB hs_err_t hs_buffer_init_with_size(hs_buffer_t *self, size_t size) {
+HS_LIB hs_err_t
+hs_buffer_init_with_size(hs_buffer_t *self, size_t size) {
     if ((self->mem = malloc(size)) == NULL) return HS_CREATE_ERR(HS_MALLOC_ERR);
     self->cap = size;
     self->len = 0;
@@ -27,8 +29,9 @@ HS_LIB hs_err_t hs_buffer_init_with_size(hs_buffer_t *self, size_t size) {
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_LIB hs_err_t hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems,
-                                     const void *src, void **beginning_ptr) {
+HS_LIB hs_err_t
+hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, const void *src,
+                     void **beginning_ptr) {
     assert(!(SIZE_MAX / item_size < nitems));
     size_t add_size = item_size * nitems;
 
@@ -65,7 +68,8 @@ HS_LIB hs_err_t hs_buffer_append_mem(hs_buffer_t *self, const int item_size, con
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_LIB void hs_buffer_free(hs_buffer_t *self) {
+HS_LIB void
+hs_buffer_free(hs_buffer_t *self) {
     if (self != NULL) {
         if (self->mem != NULL) free(self->mem);
         self->len = 0;
@@ -74,8 +78,9 @@ HS_LIB void hs_buffer_free(hs_buffer_t *self) {
     }
 }
 
-HS_LIB hs_err_t hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence,
-                                          const size_t sentence_len, char **beginning_ptr) {
+HS_LIB hs_err_t
+hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len,
+                          char **beginning_ptr) {
     hs_err_t err;
     if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, 1, sentence_len, sentence, NULL)))
         return err;
@@ -84,8 +89,8 @@ HS_LIB hs_err_t hs_buffer_append_sentence(hs_buffer_t *self, const char *sentenc
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_LIB hs_err_t hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other,
-                                      void **beginning_ptr) {
+HS_LIB hs_err_t
+hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other, void **beginning_ptr) {
     hs_err_t err;
     if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, other->len, 1, other->mem, NULL)))
         return err;

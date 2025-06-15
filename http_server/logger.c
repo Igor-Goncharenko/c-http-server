@@ -17,8 +17,9 @@ static const int _level_colors[] = {
     [HS_LOG_LEVEL_ERROR] = 31, /* red */
 };
 
-HS_LIB void hs_log_log(const log_level_e level, const int line, const char *file, const char *func,
-                       const char *fmt, ...) {
+HS_LIB void
+hs_log_log(const log_level_e level, const int line, const char *file, const char *func,
+           const char *fmt, ...) {
     char time_buf[16], date_buf[16];
     va_list args;
     time_t t = time(NULL);
