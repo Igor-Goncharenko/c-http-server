@@ -9,6 +9,7 @@ extern "C" {
 #error "GCC or Clang required"
 #endif
 
+#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
@@ -109,6 +110,9 @@ typedef struct {
     hs_http_method_e    method;
     char                *route_tmp;
     hs_route_callback   cb;
+
+    /* internal */
+    regex_t _re;
 } hs_server_route_t;
 
 typedef struct {

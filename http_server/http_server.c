@@ -308,6 +308,10 @@ HS_API void
 hs_server_destroy(hs_server_t *self) {
     self->running = false;
 
+    for (int i = 0; i < self->n_routes; i++) {
+        regfree(&self->routes[i]._re);
+    }
+
     if (self->fd > 0)
         close(self->fd);
     self->fd = -1;
@@ -320,8 +324,8 @@ hs_server_destroy(hs_server_t *self) {
 }
 
 HS_API int
-hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_server_route_t *routes, 
-        const int n_routes) {
+hs_init_server(hs_server_t *self, const int port, const int to_listen, 
+        const hs_server_route_t *routes, const int n_routes) {
     hs_err_t err;
 
     self->epoll_fd = -1;

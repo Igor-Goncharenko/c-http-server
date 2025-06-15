@@ -13,6 +13,7 @@ extern "C" {
 #error "GCC or Clang required"
 #endif
 
+#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <time.h>
@@ -113,6 +114,9 @@ typedef struct {
     hs_http_method_e    method;
     char                *route_tmp;
     hs_route_callback   cb;
+
+    /* internal */
+    regex_t _re;
 } hs_server_route_t;
 
 typedef struct {
@@ -679,6 +683,10 @@ HS_API void
 hs_server_destroy(hs_server_t *self) {
     self->running = false;
 
+    for (int i = 0; i < self->n_routes; i++) {
+        regfree(&self->routes[i]._re);
+    }
+
     if (self->fd > 0)
         close(self->fd);
     self->fd = -1;
@@ -691,8 +699,8 @@ hs_server_destroy(hs_server_t *self) {
 }
 
 HS_API int
-hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_server_route_t *routes, 
-        const int n_routes) {
+hs_init_server(hs_server_t *self, const int port, const int to_listen, 
+        const hs_server_route_t *routes, const int n_routes) {
     hs_err_t err;
 
     self->epoll_fd = -1;
@@ -1417,6 +1425,7 @@ _hs_create_regex_from_user_str(const char *str, char **re) {
     }
 
     _hs_escape_symbols_and_append(str + last_c, strlen(str + last_c), &buf);
+    hs_buffer_append_mem(&buf, 1, 1, "$", NULL);
     hs_buffer_append_mem(&buf, 1, 1, "\0", NULL);
 
     LOG_TRACE("New route created for tmp '%s': '%s'.", str, buf.data);
@@ -1435,8 +1444,13 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
     /* count mem */
     const int routes_list_mem = n_routes * sizeof(hs_server_route_t);
     int total_mem = routes_list_mem;
-    for (int i = 0; i < n_routes; i++)
-        total_mem += strlen(routes[i].route_tmp) + 1;
+    for (int i = 0; i < n_routes; i++) {
+        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re)))
+            goto failed;
+        total_mem += strlen(route_re) + 1;
+        free(route_re);
+        route_re = NULL;
+    }
 
     if (    HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, total_mem)) ||
             HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, sizeof(hs_server_route_t), 
@@ -1450,12 +1464,13 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
         goto failed;
     }
 
-
     for (int i = 0; i < n_routes; i++) {
         if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re)))
             goto failed;
-        if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, route_re, 
-                        strlen(routes[i].route_tmp), &self->routes[i].route_tmp)))
+        if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, route_re, strlen(route_re), 
+                        &self->routes[i].route_tmp)))
+            goto failed;
+        if (regcomp(&self->routes[i]._re, self->routes[i].route_tmp, REG_EXTENDED) != 0)
             goto failed;
         free(route_re);
         route_re = NULL;
@@ -1468,6 +1483,9 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
 failed:
     if (route_re != NULL) free(route_re);
     hs_buffer_free(&buf);
+    for (int i = 0; i < n_routes; i++) {
+        regfree(&self->routes[i]._re);
+    }
     return err;
 }
 
