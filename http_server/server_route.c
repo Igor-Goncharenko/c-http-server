@@ -45,51 +45,66 @@ _hs_should_escape(const char ch) {
 }
 
 HS_STATIC hs_err_t 
-_hs_escape_symbols_and_append(const char *str, const int len, hs_buffer_t *buf) {
+_hs_escape_char_and_add(const char *str, const int len, hs_buffer_t *buf) {
+    hs_err_t err;
     for (int i = 0; i < len; i++) {
         if (_hs_should_escape(str[i])) {
-            hs_buffer_append_mem(buf, 1, 1, "\\", NULL);
+            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, "\\", NULL)))
+                return err;
         }
-        hs_buffer_append_mem(buf, 1, 1, &str[i], NULL);
+        if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, &str[i], NULL)))
+            return err;
     }
-
     return HS_CREATE_ERR(HS_OK);
 }
 
 HS_STATIC hs_err_t 
-_hs_create_regex_from_user_str(const char *str, char **re) {
-    // TODO: add error check
+_hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
+    hs_err_t err;
     hs_buffer_t buf;
     int last_c = 0;;
+    *n_matches = 0;
     char *start, *end;
 
     hs_buffer_init(&buf);
 
     while ((start = strchr(str + last_c, '{')) != NULL) {
-        _hs_escape_symbols_and_append(str + last_c, start - str, &buf);
+        if (HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, start - str, &buf)))
+            goto failed;
+
         last_c = start - str;
         end = strchr(str, '}');
+
+        (*n_matches)++;
 
         const char *re_fmt = _hs_find_user_str(start, end - start);
         if (re_fmt == NULL) {
             LOG_ERROR("Incorrect format: '%.*s'.", end - start, start);
-            hs_buffer_free(&buf);
-            return HS_CREATE_ERR(HS_ROUTE_ERR);
+            err = HS_CREATE_ERR(HS_ROUTE_ERR);
+            goto failed;
         }
 
-        hs_buffer_append_mem(&buf, 1, strlen(re_fmt), re_fmt, NULL);
+        if (    HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "(", NULL)) ||
+                HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, strlen(re_fmt), re_fmt, NULL)) ||
+                HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, ")", NULL)))
+            goto failed;
         last_c = end - str + 1;
     }
 
-    _hs_escape_symbols_and_append(str + last_c, strlen(str + last_c), &buf);
-    hs_buffer_append_mem(&buf, 1, 1, "$", NULL);
-    hs_buffer_append_mem(&buf, 1, 1, "\0", NULL);
-
-    LOG_TRACE("New route created for tmp '%s': '%s'.", str, buf.data);
+    if (    HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, strlen(str + last_c), &buf)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "$", NULL)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "\0", NULL)))
+        goto failed;
 
     *re = buf.data;
 
     return HS_CREATE_ERR(HS_OK);
+
+failed:
+    *re = NULL;
+    *n_matches = 0;
+    hs_buffer_free(&buf);
+    return err;
 }
 
 HS_LIB hs_err_t
@@ -102,7 +117,8 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
     const int routes_list_mem = n_routes * sizeof(hs_server_route_t);
     int total_mem = routes_list_mem;
     for (int i = 0; i < n_routes; i++) {
-        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re)))
+        int tmp = 0;
+        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re, &tmp)))
             goto failed;
         total_mem += strlen(route_re) + 1;
         free(route_re);
@@ -122,7 +138,8 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
     }
 
     for (int i = 0; i < n_routes; i++) {
-        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re)))
+        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re, 
+                        &self->routes[i]._n_matches)))
             goto failed;
         if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, route_re, strlen(route_re), 
                         &self->routes[i].route_tmp)))
@@ -131,6 +148,9 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
             goto failed;
         free(route_re);
         route_re = NULL;
+
+        LOG_TRACE("New route created for tmp '%s': '%s' (%d).", routes[i].route_tmp, 
+                self->routes[i].route_tmp, self->routes[i]._n_matches);
     }
 
     self->mem = buf.mem;

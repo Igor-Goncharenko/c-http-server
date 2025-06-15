@@ -104,7 +104,7 @@ typedef struct {
  ********************************************
  */
 
-typedef int (*hs_route_callback)(const hs_request_data_t*, hs_response_t*);
+typedef int (*hs_route_callback)(hs_response_t*, const hs_request_data_t*, char**, const int);
 
 typedef struct {
     hs_http_method_e    method;
@@ -112,7 +112,8 @@ typedef struct {
     hs_route_callback   cb;
 
     /* internal */
-    regex_t _re;
+    regex_t             _re;
+    int                 _n_matches;
 } hs_server_route_t;
 
 typedef struct {

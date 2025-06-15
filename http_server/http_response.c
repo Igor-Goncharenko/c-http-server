@@ -77,6 +77,40 @@ _find_route(const hs_server_t *server, const hs_request_data_t *request) {
     return NULL;
 }
 
+HS_STATIC hs_err_t 
+_hs_parse_route_matches(const hs_request_data_t *req, const hs_server_route_t *route, 
+        char ***matches) {
+    hs_err_t err;
+    hs_buffer_t buf;
+    regmatch_t *rematches;
+
+    rematches = malloc(sizeof(regmatch_t) * (1 + route->_n_matches));
+
+    const int arr_size = sizeof(char*) * route->_n_matches;
+    const int route_len = strlen(req->route);
+
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, arr_size + route_len))) 
+        goto failed;
+    buf.len += arr_size;
+
+    if (regexec(&route->_re, req->route, route->_n_matches + 1, rematches, 0) == 0) {
+        for (int i = 0; i < route->_n_matches; i++) {
+            err = hs_buffer_append_sentence(&buf, req->route + rematches[i + 1].rm_so, 
+                    rematches[i + 1].rm_eo - rematches[i + 1].rm_so, buf.mem + i * sizeof(char*));
+            if (err.code != HS_OK)
+                goto failed;
+        }
+    } 
+
+    *matches = buf.mem;
+    free(rematches);
+    return HS_CREATE_ERR(HS_OK);
+failed:
+    free(rematches);
+    hs_buffer_free(&buf);
+    return err;
+}
+
 HS_STATIC hs_err_t
 _process_route(hs_server_route_t *route, const hs_request_data_t *request, char **resp_dest, 
         int *resp_len) {
@@ -88,12 +122,19 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
         "%s"
         "\r\n";
 
-    hs_err_e err_e = HS_OK;
+    hs_err_t err = HS_CREATE_ERR(HS_OK);
     const char *type_str, *subtype_str;
     hs_response_t resp = { 0 };
+    char **matches = NULL;
 
-    if (route->cb(request, &resp) != 0) {
-        err_e = HS_ROUTE_ERR;
+    if (route->_n_matches > 0 && 
+            HS_ERROR_CHECK(err, _hs_parse_route_matches(request, route, &matches))) {
+        // TODO: process err
+        goto cleanup;
+    }
+
+    if (route->cb(&resp, request, matches, route->_n_matches) != 0) {
+        err = HS_CREATE_ERR(HS_ROUTE_ERR);
         goto cleanup;
     }
 
@@ -102,20 +143,20 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
     *resp_dest = malloc(resp.content_len + code_str_len + sizeof(resp_fmt) + 256);
     if (*resp_dest == NULL) {
-        err_e = HS_MALLOC_ERR;
+        err = HS_CREATE_ERR(HS_MALLOC_ERR);
         goto cleanup;
     }
 
     *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type, 
             resp.content_len, (resp.headers.len <= 0) ? "" : resp.headers.data);
     if (*resp_len <= 0) {
-        err_e = HS_STDIO_ERR;
+        err = HS_CREATE_ERR(HS_STDIO_ERR);
         goto cleanup;
     }
 
     if (resp.content_len > 0) {
         if (memcpy((*resp_dest) + (*resp_len), resp.content, resp.content_len) == NULL) {
-            err_e = HS_MEMCPY_ERR;
+            err = HS_CREATE_ERR(HS_MEMCPY_ERR);
             goto cleanup;
         }
         *resp_len += resp.content_len;
@@ -123,7 +164,8 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
 cleanup:
     hs_response_free(&resp);
-    return HS_CREATE_ERR(err_e);
+    free(matches);
+    return err;
 }
 
 HS_LIB hs_err_t

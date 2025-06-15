@@ -9,7 +9,7 @@
 
 #define n_routes 3
 
-int home_callback(const hs_request_data_t *request, hs_response_t *dest) {
+int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
     if ((dest->content_len = hs_load_file("home.html", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -20,15 +20,23 @@ int home_callback(const hs_request_data_t *request, hs_response_t *dest) {
     return 0;
 }
 
-int css_callback(const hs_request_data_t *request, hs_response_t *dest) {
-    if ((dest->content_len = hs_load_file("home.css", &dest->content)) <= 0) return -1;
+int css_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
+    int len = strlen(data[0]);
+    char *filename = malloc(len + 5);
+
+    strcpy(filename, data[0]);
+    strcat(filename, ".css");
+
+    if ((dest->content_len = hs_load_file(filename, &dest->content)) <= 0) return -1;
     dest->code = 200;
     strcpy(dest->content_type, "text/css");
+
+    free(filename);
 
     return 0;
 }
 
-int favicon_callback(const hs_request_data_t *request, hs_response_t *dest) {
+int favicon_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
     if ((dest->content_len = hs_load_file("favicon.ico", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
