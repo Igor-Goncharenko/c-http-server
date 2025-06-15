@@ -1,15 +1,16 @@
-#include "../../http_server.h"
-
 #include <assert.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <string.h>
+
+#include "../../http_server.h"
 
 #define n_routes 4
 
-int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
+int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                  const int n_data) {
     if ((dest->content_len = hs_load_file("home.html", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -20,7 +21,8 @@ int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **
     return 0;
 }
 
-int css_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
+int css_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                 const int n_data) {
     int len = strlen(data[0]);
     char *filename = malloc(len + 5);
 
@@ -36,7 +38,8 @@ int css_callback(hs_response_t *dest, const hs_request_data_t *request, char **d
     return 0;
 }
 
-int favicon_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
+int favicon_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                     const int n_data) {
     if ((dest->content_len = hs_load_file("favicon.ico", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -45,7 +48,8 @@ int favicon_callback(hs_response_t *dest, const hs_request_data_t *request, char
     return 0;
 }
 
-int user_callback(hs_response_t *dest, const hs_request_data_t *request, char **data, const int n_data) {
+int user_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                  const int n_data) {
     static const char fmt[] = "<h1>User #%s</h1>";
     const int data_len = strlen(data[0]);
     dest->content = malloc(strlen(fmt) + data_len);
@@ -57,9 +61,7 @@ int user_callback(hs_response_t *dest, const hs_request_data_t *request, char **
 
 hs_server_t server;
 
-void cleanup(void) {
-    hs_server_destroy(&server);
-}
+void cleanup(void) { hs_server_destroy(&server); }
 
 void handle_sigint(int sig) {
     printf("Handled SIGINT\n");
