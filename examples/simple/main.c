@@ -9,7 +9,7 @@
 
 #define n_routes 3
 
-int home_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+int home_callback(const hs_request_data_t *request, hs_response_t *dest) {
     if ((dest->content_len = hs_load_file("home.html", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -20,7 +20,7 @@ int home_callback(const hs_request_data_t *request, const va_list args, hs_respo
     return 0;
 }
 
-int home_css_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+int css_callback(const hs_request_data_t *request, hs_response_t *dest) {
     if ((dest->content_len = hs_load_file("home.css", &dest->content)) <= 0) return -1;
     dest->code = 200;
     strcpy(dest->content_type, "text/css");
@@ -28,7 +28,7 @@ int home_css_callback(const hs_request_data_t *request, const va_list args, hs_r
     return 0;
 }
 
-int favicon_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+int favicon_callback(const hs_request_data_t *request, hs_response_t *dest) {
     if ((dest->content_len = hs_load_file("favicon.ico", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -71,19 +71,16 @@ int main(int argc, char *argv[]) {
             .method = HS_METHOD_GET,
             .route_tmp = "/",
             .cb = home_callback,
-            .n_args = 0,
         },
         {
             .method = HS_METHOD_GET,
-            .route_tmp = "/home.css",
-            .cb = home_css_callback,
-            .n_args = 0,
+            .route_tmp = "/{str}.css",
+            .cb = css_callback,
         },
         {
             .method = HS_METHOD_GET,
             .route_tmp = "/favicon.ico",
             .cb = favicon_callback,
-            .n_args = 0,
         },
     };
 

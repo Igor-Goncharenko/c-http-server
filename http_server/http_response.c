@@ -71,13 +71,14 @@ _find_route(const hs_server_t *server, const hs_request_data_t *request) {
 
     for (int i = 0; i < server->n_routes; i++) {
         hs_server_route_t *route = &server->routes[i];
-        if (route->n_args > 0) {
-            va_copy(args_cpy, route->args);
-            if (vsscanf(request->route, route->route_tmp, args_cpy) == route->n_args) {
-                found_route = route;
-                break;
-            }
-        } else if (strcmp(route->route_tmp, request->route) == 0) {
+        // if (route->n_args > 0) {
+        //     va_copy(args_cpy, route->args);
+        //     if (vsscanf(request->route, route->route_tmp, args_cpy) == route->n_args) {
+        //         found_route = route;
+        //         break;
+        //     }
+        //} else 
+        if (strcmp(route->route_tmp, request->route) == 0) {
             found_route = route;
             break;
         }
@@ -99,13 +100,9 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
     hs_err_e err_e = HS_OK;
     const char *type_str, *subtype_str;
-    va_list args_cpy;
     hs_response_t resp = { 0 };
 
-    va_copy(args_cpy, route->args);
-
-
-    if (route->cb(request, args_cpy, &resp) != 0) {
+    if (route->cb(request, &resp) != 0) {
         err_e = HS_ROUTE_ERR;
         goto cleanup;
     }

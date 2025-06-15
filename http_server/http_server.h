@@ -103,14 +103,12 @@ typedef struct {
  ********************************************
  */
 
-typedef int (*hs_route_callback)(const hs_request_data_t*, const va_list, hs_response_t*);
+typedef int (*hs_route_callback)(const hs_request_data_t*, hs_response_t*);
 
 typedef struct {
-    hs_http_method_e       method;
+    hs_http_method_e    method;
     char                *route_tmp;
-    hs_route_callback      cb;
-    va_list             args;
-    int                 n_args;
+    hs_route_callback   cb;
 } hs_server_route_t;
 
 typedef struct {
@@ -124,7 +122,7 @@ typedef struct {
 
     bool                running;
 
-    hs_server_route_t      *routes;
+    hs_server_route_t   *routes;
     int                 n_routes;
 } hs_server_t;
 
