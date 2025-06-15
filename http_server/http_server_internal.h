@@ -170,4 +170,13 @@ hs_form_response(const hs_server_t *server, const hs_request_data_t *request, ch
 HS_LIB hs_err_t 
 hs_create_error_response(char **dest, int *dest_size, const int code);
 
+/*
+ ********************************************
+ *              SERVER ROUTE                *
+ ********************************************
+ */
+
+HS_LIB hs_err_t
+hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes, const int n_routes);
+
 #endif /* HTTP_SERVER_INTERNAL_H_ */
