@@ -40,8 +40,8 @@ typedef enum {
 
 typedef struct {
     hs_err_e code;
-    int             errno_;
-    int             line;
+    int errno_;
+    int line;
 } hs_err_t;
 
 HS_LIB const char*
@@ -105,13 +105,13 @@ hs_log_log(const log_level_e level, const int line, const char *file, const char
 
 typedef struct {
     union {
-        void            *mem;
-        char            *data;
+        void *mem;
+        char *data;
     };
-    size_t              len;
-    size_t              cap;
+    size_t len;
+    size_t cap;
 
-    bool                allow_realloc;
+    bool allow_realloc;
 } hs_buffer_t;
 
 /** @brief Inits buffer structure */

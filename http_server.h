@@ -35,11 +35,11 @@ extern "C" {
  */
 
 typedef struct {
-    char            *key;
-    int             key_len;
+    char *key;
+    int key_len;
 
-    char            *value;
-    int             value_len;
+    char *value;
+    int value_len;
 } hs_header_t;
 
 #define HS_VERSION_LAST (HS_VERSION_UNKNOWN)
@@ -62,21 +62,21 @@ typedef enum {
 } hs_http_method_e;
 
 typedef struct {
-    char                *mem;
-    size_t              mem_len;
+    char *mem;
+    size_t mem_len;
 
-    time_t              time;
+    time_t time;
 
-    hs_http_method_e       method;
-    char                *route;
-    hs_http_version_e      version;
-    int                 code;
+    hs_http_method_e method;
+    char *route;
+    hs_http_version_e version;
+    int code;
 
-    hs_header_t            *headers;
-    int                 n_headers;
+    hs_header_t *headers;
+    int n_headers;
 
-    char                *content;
-    size_t              content_len;
+    char *content;
+    size_t content_len;
 } hs_request_data_t;
 
 
@@ -89,16 +89,16 @@ typedef struct {
 #define HS_CONTENT_TYPE_BUF_MAX 20
 
 typedef struct {
-    int                 code;
+    int code;
 
-    char                content_type[HS_CONTENT_TYPE_BUF_MAX];
-    char                *content;
-    int                 content_len;
+    char content_type[HS_CONTENT_TYPE_BUF_MAX];
+    char *content;
+    int content_len;
 
     struct {
-        char            *data;
-        int             len;
-        int             cap;
+        char *data;
+        int len;
+        int cap;
     } headers;
 } hs_response_t;
 
@@ -111,28 +111,28 @@ typedef struct {
 typedef int (*hs_route_callback)(hs_response_t*, const hs_request_data_t*, char**, const int);
 
 typedef struct {
-    hs_http_method_e    method;
-    char                *route_tmp;
-    hs_route_callback   cb;
+    hs_http_method_e method;
+    char *route_tmp;
+    hs_route_callback cb;
 
     /* internal */
-    regex_t             _re;
-    int                 _n_matches;
+    regex_t _re;
+    int _n_matches;
 } hs_server_route_t;
 
 typedef struct {
-    void                *mem;
+    void *mem;
 
-    int                 fd;
-    struct sockaddr_in  addr;
+    int fd;
+    struct sockaddr_in addr;
 
-    int                 epoll_fd;
-    struct epoll_event  event;
+    int epoll_fd;
+    struct epoll_event event;
 
-    bool                running;
+    bool running;
 
-    hs_server_route_t   *routes;
-    int                 n_routes;
+    hs_server_route_t *routes;
+    int n_routes;
 } hs_server_t;
 
 /*
@@ -251,8 +251,8 @@ typedef enum {
 
 typedef struct {
     hs_err_e code;
-    int             errno_;
-    int             line;
+    int errno_;
+    int line;
 } hs_err_t;
 
 HS_LIB const char*
@@ -316,13 +316,13 @@ hs_log_log(const log_level_e level, const int line, const char *file, const char
 
 typedef struct {
     union {
-        void            *mem;
-        char            *data;
+        void *mem;
+        char *data;
     };
-    size_t              len;
-    size_t              cap;
+    size_t len;
+    size_t cap;
 
-    bool                allow_realloc;
+    bool allow_realloc;
 } hs_buffer_t;
 
 /** @brief Inits buffer structure */
