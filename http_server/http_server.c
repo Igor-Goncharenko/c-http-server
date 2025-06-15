@@ -1,6 +1,9 @@
+#include "http_server.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <regex.h>
 #include <stdarg.h>
@@ -8,30 +11,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <netinet/in.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
-#include "http_server.h"
 #include "http_server_internal.h"
 
-#define READ_HEADERS_CHARS_LIMIT        8192
-#define READ_BUFFER_LEN                 1024
+#define READ_HEADERS_CHARS_LIMIT 8192
+#define READ_BUFFER_LEN 1024
 
-#define MAX_EVENTS                      64
+#define MAX_EVENTS 64
 
-HS_API const char*
-hs_get_header(const hs_request_data_t *request, const char *header) {
+HS_API const char *hs_get_header(const hs_request_data_t *request, const char *header) {
     for (int i = 0; i < request->n_headers; i++)
-        if (strcmp(header, request->headers[i].key) == 0)
-            return request->headers[i].value;
+        if (strcmp(header, request->headers[i].key) == 0) return request->headers[i].value;
     return NULL;
 }
 
-HS_API int 
-hs_response_add_header(hs_response_t *resp, const char *key, const char *value) {
+HS_API int hs_response_add_header(hs_response_t *resp, const char *key, const char *value) {
     const int key_len = strlen(key), value_len = strlen(value);
     const int total_len = key_len + value_len + 4;  // 4: ": " + "\r\n" symbols
 
@@ -46,10 +44,10 @@ hs_response_add_header(hs_response_t *resp, const char *key, const char *value) 
         if (resp->headers.data == NULL) return -1;
     }
 
-    if (    strcpy(resp->headers.data + resp->headers.len, key) == NULL ||
-            strcpy(resp->headers.data + resp->headers.len + key_len, ": ") == NULL ||
-            strcpy(resp->headers.data + resp->headers.len + key_len + 2, value) == NULL ||
-            strcpy(resp->headers.data + resp->headers.len + total_len - 2, "\r\n") == NULL)
+    if (strcpy(resp->headers.data + resp->headers.len, key) == NULL ||
+        strcpy(resp->headers.data + resp->headers.len + key_len, ": ") == NULL ||
+        strcpy(resp->headers.data + resp->headers.len + key_len + 2, value) == NULL ||
+        strcpy(resp->headers.data + resp->headers.len + total_len - 2, "\r\n") == NULL)
         return -2;
 
     resp->headers.len += total_len;
@@ -57,8 +55,7 @@ hs_response_add_header(hs_response_t *resp, const char *key, const char *value) 
     return 0;
 }
 
-HS_API void 
-hs_response_free(hs_response_t *resp) {
+HS_API void hs_response_free(hs_response_t *resp) {
     if (resp->headers.data != NULL && resp->headers.cap > 0) {
         resp->headers.cap = 0;
         resp->headers.len = 0;
@@ -70,8 +67,7 @@ hs_response_free(hs_response_t *resp) {
     }
 }
 
-HS_API size_t 
-hs_load_file(const char *filename, char **dest) {
+HS_API size_t hs_load_file(const char *filename, char **dest) {
     FILE *fd;
     struct stat fd_stat;
     char *buf = NULL;
@@ -113,8 +109,7 @@ hs_load_file(const char *filename, char **dest) {
  ********************************************
  */
 
-HS_STATIC hs_err_t
-_hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
+HS_STATIC hs_err_t _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
     hs_err_t err;
     int chars_count = 0;
     int new_line_count = 0;
@@ -123,8 +118,7 @@ _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
     char buffer[READ_BUFFER_LEN];
     int buffer_len = 0;
 
-    if (HS_ERROR_CHECK(err, hs_buffer_init(dest)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_init(dest))) goto failed;
     dest->allow_realloc = true;
 
     while (new_line_count < 2 && chars_count < READ_HEADERS_CHARS_LIMIT) {
@@ -138,12 +132,11 @@ _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
 
         buffer[buffer_len++] = ch;
         if (buffer_len == READ_BUFFER_LEN) {
-            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, 1024, buffer, NULL)))
-                goto failed;
+            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, 1024, buffer, NULL))) goto failed;
             buffer_len = 0;
         }
 
-        if (ch == '\r') 
+        if (ch == '\r')
             continue;
         else if (ch == '\n')
             new_line_count++;
@@ -151,8 +144,7 @@ _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
             new_line_count = 0;
     }
 
-    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, buffer_len, buffer, NULL)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, buffer_len, buffer, NULL))) goto failed;
 
     return HS_CREATE_ERR(HS_OK);
 
@@ -161,14 +153,12 @@ failed:
     return err;
 }
 
-HS_STATIC hs_err_t
-_hs_read_body(const int client_fd, hs_buffer_t *dest, const int size) {
+HS_STATIC hs_err_t _hs_read_body(const int client_fd, hs_buffer_t *dest, const int size) {
     hs_err_t err;
     char buffer[READ_BUFFER_LEN];
     int total_len = 0;
 
-    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(dest, size)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(dest, size))) goto failed;
 
     while (total_len < size) {
         int to_read = (size - total_len < READ_BUFFER_LEN) ? size - total_len : READ_BUFFER_LEN;
@@ -190,14 +180,12 @@ failed:
     return err;
 }
 
-HS_STATIC int
-_hs_get_content_len(const hs_request_data_t *request) {
+HS_STATIC int _hs_get_content_len(const hs_request_data_t *request) {
     const char *value_str = hs_get_header(request, "Content-Length");
     return (value_str == NULL) ? 0 : atoi(value_str);
 }
 
-HS_STATIC hs_err_t
-_hs_send_internal_error(const int fd) {
+HS_STATIC hs_err_t _hs_send_internal_error(const int fd) {
     hs_err_t err;
     char *resp = NULL;
     int resp_len;
@@ -213,8 +201,7 @@ _hs_send_internal_error(const int fd) {
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_STATIC hs_err_t
-_hs_send_response(const int fd, const char *response, const int response_len) {
+HS_STATIC hs_err_t _hs_send_response(const int fd, const char *response, const int response_len) {
     if (response_len <= 0 || response == NULL) return HS_CREATE_ERR(HS_WRITE_ERR);
     int bytes_sent = 0;
 
@@ -229,30 +216,26 @@ _hs_send_response(const int fd, const char *response, const int response_len) {
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_STATIC hs_err_t
-_hs_handle_client(const hs_server_t *server, const int fd) {
+HS_STATIC hs_err_t _hs_handle_client(const hs_server_t *server, const int fd) {
     hs_err_t err = HS_CREATE_ERR(HS_OK);
-    hs_request_data_t request = { 0 };
-    hs_buffer_t headers_raw = { 0 }, content_buf = { 0 };
+    hs_request_data_t request = {0};
+    hs_buffer_t headers_raw = {0}, content_buf = {0};
 
     char *response = NULL;
     int response_len = 0;
 
     LOG_DEBUG("New client handled: %d.", fd);
 
-    if (HS_ERROR_CHECK(err, _hs_read_headers_raw(fd, &headers_raw)))
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, _hs_read_headers_raw(fd, &headers_raw))) goto cleanup;
 
-    if (HS_ERROR_CHECK(err, hs_parse_http_request(&request, &headers_raw)))
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, hs_parse_http_request(&request, &headers_raw))) goto cleanup;
 
     int content_len = _hs_get_content_len(&request);
 
     LOG_DEBUG("Client %d: path=\"%s\".", fd, request.route);
 
     if (content_len > 0) {
-        if (HS_ERROR_CHECK(err, _hs_read_body(fd, &content_buf, content_len)))
-            goto cleanup;
+        if (HS_ERROR_CHECK(err, _hs_read_body(fd, &content_buf, content_len))) goto cleanup;
         request.content_len = content_len;
         request.content = content_buf.data;
     }
@@ -260,8 +243,7 @@ _hs_handle_client(const hs_server_t *server, const int fd) {
     if (HS_ERROR_CHECK(err, hs_form_response(server, &request, &response, &response_len)))
         goto cleanup;
 
-    if (HS_ERROR_CHECK(err, _hs_send_response(fd, response, response_len))) 
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, _hs_send_response(fd, response, response_len))) goto cleanup;
 
 cleanup:
     hs_buffer_free(&headers_raw);
@@ -279,14 +261,12 @@ cleanup:
  ********************************************
  */
 
-HS_STATIC void 
-_hs_set_nonblocking(int fd) {
+HS_STATIC void _hs_set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
-HS_STATIC hs_err_t
-_hs_init_server_epoll(hs_server_t *self) {
+HS_STATIC hs_err_t _hs_init_server_epoll(hs_server_t *self) {
     hs_err_t err = HS_CREATE_ERR(HS_OK);
 
     if ((self->epoll_fd = epoll_create1(0)) == -1) {
@@ -304,28 +284,23 @@ end:
     return err;
 }
 
-HS_API void
-hs_server_destroy(hs_server_t *self) {
+HS_API void hs_server_destroy(hs_server_t *self) {
     self->running = false;
 
     for (int i = 0; i < self->n_routes; i++) {
         regfree(&self->routes[i]._re);
     }
 
-    if (self->fd > 0)
-        close(self->fd);
+    if (self->fd > 0) close(self->fd);
     self->fd = -1;
 
-    if (self->epoll_fd > 0)
-        close(self->epoll_fd);
+    if (self->epoll_fd > 0) close(self->epoll_fd);
 
-    if (self->mem != NULL)
-        free(self->mem);
+    if (self->mem != NULL) free(self->mem);
 }
 
-HS_API int
-hs_init_server(hs_server_t *self, const int port, const int to_listen, 
-        const hs_server_route_t *routes, const int n_routes) {
+HS_API int hs_init_server(hs_server_t *self, const int port, const int to_listen,
+                          const hs_server_route_t *routes, const int n_routes) {
     hs_err_t err;
 
     self->epoll_fd = -1;
@@ -345,10 +320,9 @@ hs_init_server(hs_server_t *self, const int port, const int to_listen,
     self->addr.sin_addr.s_addr = INADDR_ANY;
     self->addr.sin_port = htons(port);
 
-    if (HS_ERROR_CHECK(err, hs_cpy_init_routes_to_server(self, routes, n_routes)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_cpy_init_routes_to_server(self, routes, n_routes))) goto failed;
 
-    if (bind(self->fd, (struct sockaddr*)&self->addr, sizeof(self->addr)) != 0) {
+    if (bind(self->fd, (struct sockaddr *)&self->addr, sizeof(self->addr)) != 0) {
         err = HS_CREATE_ERR(HS_BIND_ERR);
         goto failed;
     }
@@ -362,19 +336,17 @@ hs_init_server(hs_server_t *self, const int port, const int to_listen,
 
     self->running = true;
 
-    if (HS_ERROR_CHECK(err, _hs_init_server_epoll(self)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, _hs_init_server_epoll(self))) goto failed;
 
     return HS_OK;
 
 failed:
     hs_server_destroy(self);
-    LOG_ERROR("Failed to init server, "HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
+    LOG_ERROR("Failed to init server, " HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
     return -1;
 }
 
-HS_API int 
-hs_start_server(hs_server_t *self) {
+HS_API int hs_start_server(hs_server_t *self) {
     hs_err_t err;
     struct epoll_event events[MAX_EVENTS];
     struct sockaddr_in client_addr;
@@ -390,7 +362,7 @@ hs_start_server(hs_server_t *self) {
         for (int i = 0; i < n; i++) {
             if (events[i].data.fd == self->fd) {
                 while (1) {
-                    int client_fd = accept(self->fd, (struct sockaddr*)&client_addr, &client_len);
+                    int client_fd = accept(self->fd, (struct sockaddr *)&client_addr, &client_len);
                     if (client_fd == -1) {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             break;
@@ -412,7 +384,7 @@ hs_start_server(hs_server_t *self) {
                 }
             } else {
                 if (HS_ERROR_CHECK(err, _hs_handle_client(self, events[i].data.fd)))
-                    LOG_ERROR("Failed to handle client: "HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
+                    LOG_ERROR("Failed to handle client: " HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
                 if (epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL) != 0)
                     LOG_ERROR("epoll_ctl error: errno='%s'(%d)", strerror(errno), errno);
                 if (close(events[i].data.fd) != 0)

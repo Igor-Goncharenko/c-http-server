@@ -1,9 +1,9 @@
+#include <regex.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "http_server.h"
 #include "http_server_internal.h"
-
-#include <regex.h>
-#include <string.h>
-#include <stdlib.h>
 
 #define HS_FORMAT_TYPE_LAST (HS_FORMAT_TYPE_INT)
 typedef enum {
@@ -11,20 +11,17 @@ typedef enum {
     HS_FORMAT_TYPE_INT,
 } hs_format_types_e;
 
-static const char 
-*HS_FORMAT_USER_STR[] = {
+static const char *HS_FORMAT_USER_STR[] = {
     [HS_FORMAT_TYPE_STR] = "{str}",
     [HS_FORMAT_TYPE_INT] = "{int}",
 };
 
-static const char 
-*HS_FORMAT_REGEX[] = {
+static const char *HS_FORMAT_REGEX[] = {
     [HS_FORMAT_TYPE_STR] = "[[:alnum:]]+",
     [HS_FORMAT_TYPE_INT] = "[[:digit:]]+",
 };
 
-HS_STATIC const char *
-_hs_find_user_str(const char *str, const int len) {
+HS_STATIC const char *_hs_find_user_str(const char *str, const int len) {
     for (int i = 0; i <= HS_FORMAT_TYPE_LAST; i++) {
         if (strncmp(str, HS_FORMAT_USER_STR[i], len) == 0) {
             return HS_FORMAT_REGEX[i];
@@ -33,10 +30,9 @@ _hs_find_user_str(const char *str, const int len) {
     return NULL;
 }
 
-HS_STATIC bool 
-_hs_should_escape(const char ch) {
-    static const char 
-    TO_ESCAPE[] = { '.', '^', '$', '*', '+', '?', '{', '}', '[', ']', '(', ')', '`', '\\' };
+HS_STATIC bool _hs_should_escape(const char ch) {
+    static const char TO_ESCAPE[] = {'.', '^', '$', '*', '+', '?', '{',
+                                     '}', '[', ']', '(', ')', '`', '\\'};
 
     for (int i = 0; i < sizeof(TO_ESCAPE); i++) {
         if (ch == TO_ESCAPE[i]) return true;
@@ -44,25 +40,22 @@ _hs_should_escape(const char ch) {
     return false;
 }
 
-HS_STATIC hs_err_t 
-_hs_escape_char_and_add(const char *str, const int len, hs_buffer_t *buf) {
+HS_STATIC hs_err_t _hs_escape_char_and_add(const char *str, const int len, hs_buffer_t *buf) {
     hs_err_t err;
     for (int i = 0; i < len; i++) {
         if (_hs_should_escape(str[i])) {
-            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, "\\", NULL)))
-                return err;
+            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, "\\", NULL))) return err;
         }
-        if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, &str[i], NULL)))
-            return err;
+        if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, &str[i], NULL))) return err;
     }
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_STATIC hs_err_t 
-_hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
+HS_STATIC hs_err_t _hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
     hs_err_t err;
     hs_buffer_t buf;
-    int last_c = 0;;
+    int last_c = 0;
+    ;
     *n_matches = 0;
     char *start, *end;
 
@@ -88,16 +81,16 @@ _hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
             goto failed;
         }
 
-        if (    HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "(", NULL)) ||
-                HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, strlen(re_fmt), re_fmt, NULL)) ||
-                HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, ")", NULL)))
+        if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "(", NULL)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, strlen(re_fmt), re_fmt, NULL)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, ")", NULL)))
             goto failed;
         last_c = end - str + 1;
     }
 
-    if (    HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, strlen(str + last_c), &buf)) ||
-            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "$", NULL)) ||
-            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "\0", NULL)))
+    if (HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, strlen(str + last_c), &buf)) ||
+        HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "$", NULL)) ||
+        HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "\0", NULL)))
         goto failed;
 
     *re = buf.data;
@@ -111,10 +104,10 @@ failed:
     return err;
 }
 
-HS_LIB hs_err_t
-hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes, const int n_routes) {
+HS_LIB hs_err_t hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
+                                             const int n_routes) {
     hs_err_t err;
-    hs_buffer_t buf = { 0 };
+    hs_buffer_t buf = {0};
     char *route_re = NULL;
     int re_init_n = 0;
 
@@ -123,19 +116,20 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
     int total_mem = routes_list_mem;
     for (int i = 0; i < n_routes; i++) {
         int tmp = 0;
-        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re, &tmp)))
+        if (HS_ERROR_CHECK(err,
+                           _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re, &tmp)))
             goto failed;
         total_mem += strlen(route_re) + 1;
         free(route_re);
         route_re = NULL;
     }
 
-    if (    HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, total_mem)) ||
-            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, sizeof(hs_server_route_t), 
-                    n_routes, NULL, NULL)))
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, total_mem)) ||
+        HS_ERROR_CHECK(err,
+                       hs_buffer_append_mem(&buf, sizeof(hs_server_route_t), n_routes, NULL, NULL)))
         goto failed;
 
-    self->routes = (hs_server_route_t*)buf.mem;
+    self->routes = (hs_server_route_t *)buf.mem;
 
     if (memcpy(self->routes, routes, routes_list_mem) == NULL) {
         err = HS_CREATE_ERR(HS_MEMCPY_ERR);
@@ -143,11 +137,11 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
     }
 
     for (int i = 0; i < n_routes; i++) {
-        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re, 
-                        &self->routes[i]._n_matches)))
+        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re,
+                                                               &self->routes[i]._n_matches)))
             goto failed;
-        if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, route_re, strlen(route_re), 
-                        &self->routes[i].route_tmp)))
+        if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, route_re, strlen(route_re),
+                                                          &self->routes[i].route_tmp)))
             goto failed;
         if (regcomp(&self->routes[i]._re, self->routes[i].route_tmp, REG_EXTENDED) != 0)
             goto failed;
@@ -155,8 +149,8 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
         free(route_re);
         route_re = NULL;
 
-        LOG_TRACE("New route created for tmp '%s': '%s' (%d).", routes[i].route_tmp, 
-                self->routes[i].route_tmp, self->routes[i]._n_matches);
+        LOG_TRACE("New route created for tmp '%s': '%s' (%d).", routes[i].route_tmp,
+                  self->routes[i].route_tmp, self->routes[i]._n_matches);
     }
 
     self->mem = buf.mem;
