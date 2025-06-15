@@ -5,4 +5,7 @@ UseTab: Never
 ColumnLimit: 100
 PointerAlignment: Right
 AlwaysBreakAfterReturnType: TopLevel
+
+# disable one line definitions
 AllowShortFunctionsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false

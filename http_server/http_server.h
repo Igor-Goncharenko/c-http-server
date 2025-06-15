@@ -9,19 +9,19 @@ extern "C" {
 #error "GCC or Clang required"
 #endif
 
+#include <netinet/in.h>
 #include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <time.h>
-#include <netinet/in.h>
 #include <sys/epoll.h>
+#include <time.h>
 
 #define HS_API extern
 #define HS_STATIC static
 #ifdef HS_SINGLE_FILE
-# define HS_LIB static
+#define HS_LIB static
 #else
-# define HS_LIB extern
+#define HS_LIB extern
 #endif /* HS_SINGLE_FILE */
 
 /*
@@ -39,10 +39,7 @@ typedef struct {
 } hs_header_t;
 
 #define HS_VERSION_LAST (HS_VERSION_UNKNOWN)
-typedef enum {
-    HS_VERSION_1_1 = 0,
-    HS_VERSION_UNKNOWN
-} hs_http_version_e;
+typedef enum { HS_VERSION_1_1 = 0, HS_VERSION_UNKNOWN } hs_http_version_e;
 
 #define HS_METHOD_LAST (HS_METHOD_UNKNOWN)
 typedef enum {
@@ -75,7 +72,6 @@ typedef struct {
     size_t content_len;
 } hs_request_data_t;
 
-
 /*
  ********************************************
  *              HTTP RESPONSE               *
@@ -104,7 +100,7 @@ typedef struct {
  ********************************************
  */
 
-typedef int (*hs_route_callback)(hs_response_t*, const hs_request_data_t*, char**, const int);
+typedef int (*hs_route_callback)(hs_response_t *, const hs_request_data_t *, char **, const int);
 
 typedef struct {
     hs_http_method_e method;
@@ -141,8 +137,8 @@ typedef struct {
  *
  */
 HS_API int
-hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_server_route_t *routes, 
-        const int n_routes);
+hs_init_server(hs_server_t *self, const int port, const int to_listen,
+               const hs_server_route_t *routes, const int n_routes);
 
 /**
  *
@@ -153,31 +149,31 @@ hs_start_server(hs_server_t *self);
 /**
  *
  */
-HS_API void 
+HS_API void
 hs_server_destroy(hs_server_t *self);
 
 /**
  *
  */
-HS_API const char*
+HS_API const char *
 hs_get_header(const hs_request_data_t *request, const char *header);
 
 /**
  *
  */
-HS_API int 
+HS_API int
 hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
 
 /**
  *
  */
-HS_API void 
+HS_API void
 hs_response_free(hs_response_t *resp);
 
 /**
  *
  */
-HS_API size_t 
+HS_API size_t
 hs_load_file(const char *filename, char **dest);
 
 #ifdef __cplusplus
