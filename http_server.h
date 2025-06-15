@@ -1400,7 +1400,7 @@ static const char
 
 HS_STATIC const char *
 _hs_find_user_str(const char *str, const int len) {
-    for (int i = 0; i < HS_FORMAT_TYPE_LAST; i++) {
+    for (int i = 0; i <= HS_FORMAT_TYPE_LAST; i++) {
         if (strncmp(str, HS_FORMAT_USER_STR[i], len) == 0) {
             return HS_FORMAT_REGEX[i];
         }
@@ -1448,13 +1448,17 @@ _hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
             goto failed;
 
         last_c = start - str;
-        end = strchr(str, '}');
+        if ((end = strchr(str, '}')) == NULL) {
+            err = HS_CREATE_ERR(HS_ROUTE_ERR);
+            goto failed;
+        }
 
         (*n_matches)++;
 
-        const char *re_fmt = _hs_find_user_str(start, end - start);
+        const int fmt_len = end - start + 1;
+        const char *re_fmt = _hs_find_user_str(start, fmt_len);
         if (re_fmt == NULL) {
-            LOG_ERROR("Incorrect format: '%.*s'.", end - start, start);
+            LOG_ERROR("Incorrect format: '%.*s'.", fmt_len, start);
             err = HS_CREATE_ERR(HS_ROUTE_ERR);
             goto failed;
         }
@@ -1485,8 +1489,9 @@ failed:
 HS_LIB hs_err_t
 hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes, const int n_routes) {
     hs_err_t err;
-    hs_buffer_t buf;
+    hs_buffer_t buf = { 0 };
     char *route_re = NULL;
+    int re_init_n = 0;
 
     /* count mem */
     const int routes_list_mem = n_routes * sizeof(hs_server_route_t);
@@ -1521,6 +1526,7 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
             goto failed;
         if (regcomp(&self->routes[i]._re, self->routes[i].route_tmp, REG_EXTENDED) != 0)
             goto failed;
+        re_init_n++;
         free(route_re);
         route_re = NULL;
 
@@ -1535,7 +1541,7 @@ hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
 failed:
     if (route_re != NULL) free(route_re);
     hs_buffer_free(&buf);
-    for (int i = 0; i < n_routes; i++) {
+    for (int i = 0; i < re_init_n; i++) {
         regfree(&self->routes[i]._re);
     }
     return err;
