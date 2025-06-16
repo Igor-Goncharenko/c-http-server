@@ -123,12 +123,13 @@ typedef struct {
     struct sockaddr_in addr;
 
     int epoll_fd;
-    struct epoll_event event;
 
     bool running;
 
     hs_server_route_t *routes;
     int n_routes;
+
+    int signal_fd;
 } hs_server_t;
 
 /*
@@ -194,6 +195,7 @@ hs_load_file(const char *filename, char **dest);
 #include <limits.h>
 #include <pthread.h>
 #include <regex.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -205,6 +207,7 @@ hs_load_file(const char *filename, char **dest);
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
+#include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 
@@ -222,6 +225,8 @@ hs_load_file(const char *filename, char **dest);
 typedef enum {
     HS_OK = 0,
     HS_ROUTE_ERR,
+    HS_PTHREAD_SIGMASK_ERR,
+    HS_SIGNALFD_ERR,
     /* General */
     HS_MALLOC_ERR,
     HS_STDIO_ERR,
@@ -639,6 +644,29 @@ cleanup:
  ********************************************
  */
 
+HS_STATIC hs_err_t
+_hs_setup_signalfd(hs_server_t *server) {
+    sigset_t mask;
+
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGINT);
+    sigaddset(&mask, SIGTERM);
+    sigaddset(&mask, SIGQUIT);
+
+    if (pthread_sigmask(SIG_BLOCK, &mask, NULL) == -1) {
+        LOG_ERROR("pthread_sigmask: %s.", strerror(errno));
+        return HS_CREATE_ERR(HS_PTHREAD_SIGMASK_ERR);
+    }
+
+    server->signal_fd = signalfd(-1, &mask, SFD_NONBLOCK);
+    if (server->signal_fd == -1) {
+        LOG_ERROR("signalfd: %s.", strerror(errno));
+        return HS_CREATE_ERR(HS_SIGNALFD_ERR);
+    }
+
+    return HS_CREATE_ERR(HS_OK);
+}
+
 HS_STATIC void
 _hs_set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
@@ -648,18 +676,27 @@ _hs_set_nonblocking(int fd) {
 HS_STATIC hs_err_t
 _hs_init_server_epoll(hs_server_t *self) {
     hs_err_t err = HS_CREATE_ERR(HS_OK);
+    struct epoll_event ev;
 
     if ((self->epoll_fd = epoll_create1(0)) == -1) {
         err = HS_CREATE_ERR(HS_EPOLL_CREATE_ERR);
         goto end;
     }
 
-    self->event.events = EPOLLIN | EPOLLET;
-    self->event.data.fd = self->fd;
-    if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, self->fd, &self->event) == -1) {
+    ev.events = EPOLLIN | EPOLLET;
+    ev.data.fd = self->fd;
+    if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, self->fd, &ev) == -1) {
         err = HS_CREATE_ERR(HS_EPOLL_CTL_ERR);
         goto end;
     }
+
+    ev.events = EPOLLIN;
+    ev.data.fd = self->signal_fd;
+    if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, self->signal_fd, &ev) == -1) {
+        err = HS_CREATE_ERR(HS_EPOLL_CTL_ERR);
+        goto end;
+    }
+
 end:
     return err;
 }
@@ -676,6 +713,7 @@ hs_server_destroy(hs_server_t *self) {
     self->fd = -1;
 
     if (self->epoll_fd > 0) close(self->epoll_fd);
+    if (self->signal_fd > 0) close(self->signal_fd);
 
     if (self->mem != NULL) free(self->mem);
 }
@@ -687,6 +725,7 @@ hs_init_server(hs_server_t *self, const int port, const int to_listen,
 
     self->epoll_fd = -1;
     self->fd = -1;
+    self->signal_fd = -1;
     self->mem = NULL;
 
     self->fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -718,6 +757,7 @@ hs_init_server(hs_server_t *self, const int port, const int to_listen,
 
     self->running = true;
 
+    if (HS_ERROR_CHECK(err, _hs_setup_signalfd(self))) goto failed;
     if (HS_ERROR_CHECK(err, _hs_init_server_epoll(self))) goto failed;
 
     return HS_OK;
@@ -743,6 +783,15 @@ hs_start_server(hs_server_t *self) {
         }
 
         for (int i = 0; i < n; i++) {
+            if (events[i].data.fd == self->signal_fd) {
+                struct signalfd_siginfo info;
+                if (read(self->signal_fd, &info, sizeof(info)) == sizeof(info)) {
+                    LOG_INFO("Recieved signal %d, shutting down.", info.ssi_signo);
+                    self->running = false;
+                }
+                continue;
+            }
+
             if (events[i].data.fd == self->fd) {
                 while (1) {
                     int client_fd = accept(self->fd, (struct sockaddr *)&client_addr, &client_len);
@@ -758,9 +807,10 @@ hs_start_server(hs_server_t *self) {
 
                     _hs_set_nonblocking(client_fd);
 
-                    self->event.events = EPOLLIN | EPOLLET;
-                    self->event.data.fd = client_fd;
-                    if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, client_fd, &self->event) == -1) {
+                    struct epoll_event ev;
+                    ev.events = EPOLLIN | EPOLLET;
+                    ev.data.fd = client_fd;
+                    if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
                         perror("epoll_ctl: client_socket");
                         close(client_fd);
                     }
@@ -1035,6 +1085,8 @@ hs_strerror(hs_err_e err) {
     static const char *hs_error_str[] = {
         [HS_OK] = "Ok",
         [HS_ROUTE_ERR] = "Route_err",
+        [HS_PTHREAD_SIGMASK_ERR] = "Sigmask_err",
+        [HS_SIGNALFD_ERR] = "Signalfd_err",
         /* General */
         [HS_MALLOC_ERR] = "Malloc_err",
         [HS_STDIO_ERR] = "Stdio_err",
@@ -1378,8 +1430,7 @@ _hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
     char *start, *end;
 
     hs_buffer_init(&buf);
-    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "^", NULL)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "^", NULL))) goto failed;
 
     while ((start = strchr(str + last_c, '{')) != NULL) {
         if (HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, start - str, &buf)))

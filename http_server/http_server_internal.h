@@ -16,6 +16,8 @@
 typedef enum {
     HS_OK = 0,
     HS_ROUTE_ERR,
+    HS_PTHREAD_SIGMASK_ERR,
+    HS_SIGNALFD_ERR,
     /* General */
     HS_MALLOC_ERR,
     HS_STDIO_ERR,

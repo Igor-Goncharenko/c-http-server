@@ -1,13 +1,63 @@
 #include <assert.h>
-#include <errno.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../../http_server.h"
 
-#define n_routes 4
+#define N_ROUTES 4
+
+int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                  const int n_data);
+int css_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                 const int n_data);
+int favicon_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                     const int n_data);
+int user_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                  const int n_data);
+
+int main(int argc, char *argv[]) {
+    hs_server_t server;
+    const hs_server_route_t routes[N_ROUTES] = {
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/",
+            .cb = home_callback,
+        },
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/{str}.css",
+            .cb = css_callback,
+        },
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/favicon.ico",
+            .cb = favicon_callback,
+        },
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/users/{int}",
+            .cb = user_callback,
+        },
+    };
+
+    if (hs_init_server(&server, 8080, 10, routes, N_ROUTES) != 0) {
+        fprintf(stderr, "Failed to init server\n");
+        return EXIT_FAILURE;
+    }
+
+    if (hs_start_server(&server) != 0) {
+        fprintf(stderr, "Failed to start server\n");
+        hs_server_destroy(&server);
+        return EXIT_FAILURE;
+    }
+
+    hs_server_destroy(&server);
+
+    return EXIT_SUCCESS;
+}
+
+/* callbacks */
 
 int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
                   const int n_data) {
@@ -57,67 +107,4 @@ int user_callback(hs_response_t *dest, const hs_request_data_t *request, char **
     dest->code = 200;
     strcpy(dest->content_type, "text/html");
     return 0;
-}
-
-hs_server_t server;
-
-void cleanup(void) { hs_server_destroy(&server); }
-
-void handle_sigint(int sig) {
-    printf("Handled SIGINT\n");
-    server.running = false;
-}
-
-void setup_signal_handler(void) {
-    struct sigaction sa;
-    memset(&sa, 0, sizeof(sa));
-
-    sa.sa_handler = handle_sigint;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-
-    if (sigaction(SIGINT, &sa, NULL) == -1) {
-        fprintf(stderr, "Failed to setup signal handler: %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-}
-
-int main(int argc, char *argv[]) {
-    atexit(cleanup);
-    setup_signal_handler();
-
-    const hs_server_route_t routes[n_routes] = {
-        {
-            .method = HS_METHOD_GET,
-            .route_tmp = "/",
-            .cb = home_callback,
-        },
-        {
-            .method = HS_METHOD_GET,
-            .route_tmp = "/{str}.css",
-            .cb = css_callback,
-        },
-        {
-            .method = HS_METHOD_GET,
-            .route_tmp = "/favicon.ico",
-            .cb = favicon_callback,
-        },
-        {
-            .method = HS_METHOD_GET,
-            .route_tmp = "/users/{int}",
-            .cb = user_callback,
-        },
-    };
-
-    if (hs_init_server(&server, 8080, 10, routes, n_routes) != 0) {
-        fprintf(stderr, "Failed to init server\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if (hs_start_server(&server) != 0) {
-        fprintf(stderr, "Failed to start server\n");
-        exit(EXIT_FAILURE);
-    }
-
-    return EXIT_SUCCESS;
 }

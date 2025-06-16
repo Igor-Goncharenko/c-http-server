@@ -119,12 +119,13 @@ typedef struct {
     struct sockaddr_in addr;
 
     int epoll_fd;
-    struct epoll_event event;
 
     bool running;
 
     hs_server_route_t *routes;
     int n_routes;
+
+    int signal_fd;
 } hs_server_t;
 
 /*

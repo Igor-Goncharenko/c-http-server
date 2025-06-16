@@ -7,6 +7,8 @@ hs_strerror(hs_err_e err) {
     static const char *hs_error_str[] = {
         [HS_OK] = "Ok",
         [HS_ROUTE_ERR] = "Route_err",
+        [HS_PTHREAD_SIGMASK_ERR] = "Sigmask_err",
+        [HS_SIGNALFD_ERR] = "Signalfd_err",
         /* General */
         [HS_MALLOC_ERR] = "Malloc_err",
         [HS_STDIO_ERR] = "Stdio_err",

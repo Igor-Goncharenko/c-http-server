@@ -64,8 +64,7 @@ _hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
     char *start, *end;
 
     hs_buffer_init(&buf);
-    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "^", NULL)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "^", NULL))) goto failed;
 
     while ((start = strchr(str + last_c, '{')) != NULL) {
         if (HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, start - str, &buf)))
