@@ -1,12 +1,12 @@
-#include "http_server.h"
-#include "http_server_internal.h"
-
+#include <regex.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const char
-*HTTP_CODE_STR[] = {
+#include "http_server.h"
+#include "http_server_internal.h"
+
+static const char *HTTP_CODE_STR[] = {
     [100] = "CONTINUE",
     [101] = "SWITCHING PROTOCOLS",
     [200] = "OK",
@@ -50,10 +50,9 @@ static const char
     [505] = "HTTP VERSION NOT SUPPORTED",
 };
 
-HS_LIB const char*
+HS_LIB const char *
 get_http_code_str(const int code) {
-    if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8)
-        return "UNKNOWN";
+    if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8) return "UNKNOWN";
     const char *res = HTTP_CODE_STR[code];
     return (res != NULL) ? res : "UNKNOWN";
 }
@@ -64,32 +63,55 @@ get_http_code_str(const int code) {
  ********************************************
  */
 
-HS_STATIC hs_server_route_t* 
+HS_STATIC hs_server_route_t *
 _find_route(const hs_server_t *server, const hs_request_data_t *request) {
-    hs_server_route_t *found_route = NULL;
-    va_list args_cpy;
-
     for (int i = 0; i < server->n_routes; i++) {
         hs_server_route_t *route = &server->routes[i];
-        if (route->n_args > 0) {
-            va_copy(args_cpy, route->args);
-            if (vsscanf(request->route, route->route_tmp, args_cpy) == route->n_args) {
-                found_route = route;
-                break;
-            }
-        } else if (strcmp(route->route_tmp, request->route) == 0) {
-            found_route = route;
-            break;
+        if (request->method == route->method &&
+            regexec(&route->_re, request->route, 0, NULL, 0) == 0) {
+            return route;
         }
     }
-
-    return found_route;
+    return NULL;
 }
 
 HS_STATIC hs_err_t
-_process_route(hs_server_route_t *route, const hs_request_data_t *request, char **resp_dest, 
-        int *resp_len) {
-    static const char resp_fmt[] = 
+_hs_parse_route_matches(const hs_request_data_t *req, const hs_server_route_t *route,
+                        char ***matches) {
+    hs_err_t err;
+    hs_buffer_t buf;
+    regmatch_t *rematches;
+
+    rematches = malloc(sizeof(regmatch_t) * (1 + route->_n_matches));
+
+    const int arr_size = sizeof(char *) * route->_n_matches;
+    const int route_len = strlen(req->route);
+
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, arr_size + route_len))) goto failed;
+    buf.len += arr_size;
+
+    if (regexec(&route->_re, req->route, route->_n_matches + 1, rematches, 0) == 0) {
+        for (int i = 0; i < route->_n_matches; i++) {
+            err = hs_buffer_append_sentence(&buf, req->route + rematches[i + 1].rm_so,
+                                            rematches[i + 1].rm_eo - rematches[i + 1].rm_so,
+                                            buf.mem + i * sizeof(char *));
+            if (err.code != HS_OK) goto failed;
+        }
+    }
+
+    *matches = buf.mem;
+    free(rematches);
+    return HS_CREATE_ERR(HS_OK);
+failed:
+    free(rematches);
+    hs_buffer_free(&buf);
+    return err;
+}
+
+HS_STATIC hs_err_t
+_process_route(hs_server_route_t *route, const hs_request_data_t *request, char **resp_dest,
+               int *resp_len) {
+    static const char resp_fmt[] =
         "HTTP/1.1 %3d %s\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %d\r\n"
@@ -97,16 +119,19 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
         "%s"
         "\r\n";
 
-    hs_err_e err_e = HS_OK;
+    hs_err_t err = HS_CREATE_ERR(HS_OK);
     const char *type_str, *subtype_str;
-    va_list args_cpy;
-    hs_response_t resp = { 0 };
+    hs_response_t resp = {0};
+    char **matches = NULL;
 
-    va_copy(args_cpy, route->args);
+    if (route->_n_matches > 0 &&
+        HS_ERROR_CHECK(err, _hs_parse_route_matches(request, route, &matches))) {
+        // TODO: process err
+        goto cleanup;
+    }
 
-
-    if (route->cb(request, args_cpy, &resp) != 0) {
-        err_e = HS_ROUTE_ERR;
+    if (route->cb(&resp, request, matches, route->_n_matches) != 0) {
+        err = HS_CREATE_ERR(HS_ROUTE_ERR);
         goto cleanup;
     }
 
@@ -115,20 +140,20 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
     *resp_dest = malloc(resp.content_len + code_str_len + sizeof(resp_fmt) + 256);
     if (*resp_dest == NULL) {
-        err_e = HS_MALLOC_ERR;
+        err = HS_CREATE_ERR(HS_MALLOC_ERR);
         goto cleanup;
     }
 
-    *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type, 
-            resp.content_len, (resp.headers.len <= 0) ? "" : resp.headers.data);
+    *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type,
+                        resp.content_len, (resp.headers.len <= 0) ? "" : resp.headers.data);
     if (*resp_len <= 0) {
-        err_e = HS_STDIO_ERR;
+        err = HS_CREATE_ERR(HS_STDIO_ERR);
         goto cleanup;
     }
 
     if (resp.content_len > 0) {
         if (memcpy((*resp_dest) + (*resp_len), resp.content, resp.content_len) == NULL) {
-            err_e = HS_MEMCPY_ERR;
+            err = HS_CREATE_ERR(HS_MEMCPY_ERR);
             goto cleanup;
         }
         *resp_len += resp.content_len;
@@ -136,12 +161,13 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
 cleanup:
     hs_response_free(&resp);
-    return HS_CREATE_ERR(err_e);
+    free(matches);
+    return err;
 }
 
 HS_LIB hs_err_t
-hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest, 
-        int *resp_len) {
+hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest,
+                 int *resp_len) {
     hs_err_t err;
     hs_server_route_t *found_route = _find_route(server, request);
 
@@ -149,8 +175,7 @@ hs_form_response(const hs_server_t *server, const hs_request_data_t *request, ch
     *resp_len = 0;
 
     if (found_route == NULL) {
-        if (HS_ERROR_CHECK(err, hs_create_error_response(resp_dest, resp_len, 404)))
-            return err;
+        if (HS_ERROR_CHECK(err, hs_create_error_response(resp_dest, resp_len, 404))) return err;
     } else {
         if (HS_ERROR_CHECK(err, _process_route(found_route, request, resp_dest, resp_len))) {
             *resp_dest = NULL;
@@ -167,29 +192,27 @@ hs_form_response(const hs_server_t *server, const hs_request_data_t *request, ch
  ********************************************
  */
 
-static const char 
-ERROR_FMT[] = 
-"HTTP/1.1 %3d %s\r\n"
-"Content-Length: %d\r\n"
-"Content-Type: text/html\r\n"
-"Connection: Closed\r\n"
-"\r\n";
+static const char ERROR_FMT[] =
+    "HTTP/1.1 %3d %s\r\n"
+    "Content-Length: %d\r\n"
+    "Content-Type: text/html\r\n"
+    "Connection: Closed\r\n"
+    "\r\n";
 
-static const char 
-ERROR_PAGE_BODY[] = 
-"<!DOCTYPE html>"
-"<html lang=\"en\">"
-"<head>"
-"<meta charset=\"UTF-8\">"
-"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-"<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">"
-"<title>%3d %s</title>"
-"</head>"
-"<body>"
-"<h1>Failed to load page</h1>"
-"<h1>%3d %s</h1>"
-"</body>"
-"</html>";
+static const char ERROR_PAGE_BODY[] =
+    "<!DOCTYPE html>"
+    "<html lang=\"en\">"
+    "<head>"
+    "<meta charset=\"UTF-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+    "<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">"
+    "<title>%3d %s</title>"
+    "</head>"
+    "<body>"
+    "<h1>Failed to load page</h1>"
+    "<h1>%3d %s</h1>"
+    "</body>"
+    "</html>";
 
 HS_LIB hs_err_t
 hs_create_error_response(char **dest, int *dest_size, const int code) {
@@ -214,15 +237,15 @@ hs_create_error_response(char **dest, int *dest_size, const int code) {
         goto failed;
     }
 
-    const int fin_header_len = snprintf(*dest, header_len, ERROR_FMT, code, code_str, 
-            fin_content_len);
+    const int fin_header_len =
+        snprintf(*dest, header_len, ERROR_FMT, code, code_str, fin_content_len);
     if (fin_content_len <= 0) {
         err_e = HS_STDIO_ERR;
         goto failed;
     }
 
-    if (snprintf(*dest + fin_header_len, content_len, ERROR_PAGE_BODY, code, code_str, code, 
-                code_str) <= 0) {
+    if (snprintf(*dest + fin_header_len, content_len, ERROR_PAGE_BODY, code, code_str, code,
+                 code_str) <= 0) {
         err_e = HS_STDIO_ERR;
         goto failed;
     }

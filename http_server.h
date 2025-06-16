@@ -13,18 +13,19 @@ extern "C" {
 #error "GCC or Clang required"
 #endif
 
+#include <netinet/in.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <time.h>
-#include <netinet/in.h>
 #include <sys/epoll.h>
+#include <time.h>
 
 #define HS_API extern
 #define HS_STATIC static
 #ifdef HS_SINGLE_FILE
-# define HS_LIB static
+#define HS_LIB static
 #else
-# define HS_LIB extern
+#define HS_LIB extern
 #endif /* HS_SINGLE_FILE */
 
 /*
@@ -34,18 +35,15 @@ extern "C" {
  */
 
 typedef struct {
-    char            *key;
-    int             key_len;
+    char *key;
+    int key_len;
 
-    char            *value;
-    int             value_len;
+    char *value;
+    int value_len;
 } hs_header_t;
 
 #define HS_VERSION_LAST (HS_VERSION_UNKNOWN)
-typedef enum {
-    HS_VERSION_1_1 = 0,
-    HS_VERSION_UNKNOWN
-} hs_http_version_e;
+typedef enum { HS_VERSION_1_1 = 0, HS_VERSION_UNKNOWN } hs_http_version_e;
 
 #define HS_METHOD_LAST (HS_METHOD_UNKNOWN)
 typedef enum {
@@ -61,23 +59,22 @@ typedef enum {
 } hs_http_method_e;
 
 typedef struct {
-    char                *mem;
-    size_t              mem_len;
+    char *mem;
+    size_t mem_len;
 
-    time_t              time;
+    time_t time;
 
-    hs_http_method_e       method;
-    char                *route;
-    hs_http_version_e      version;
-    int                 code;
+    hs_http_method_e method;
+    char *route;
+    hs_http_version_e version;
+    int code;
 
-    hs_header_t            *headers;
-    int                 n_headers;
+    hs_header_t *headers;
+    int n_headers;
 
-    char                *content;
-    size_t              content_len;
+    char *content;
+    size_t content_len;
 } hs_request_data_t;
-
 
 /*
  ********************************************
@@ -88,16 +85,16 @@ typedef struct {
 #define HS_CONTENT_TYPE_BUF_MAX 20
 
 typedef struct {
-    int                 code;
+    int code;
 
-    char                content_type[HS_CONTENT_TYPE_BUF_MAX];
-    char                *content;
-    int                 content_len;
+    char content_type[HS_CONTENT_TYPE_BUF_MAX];
+    char *content;
+    int content_len;
 
     struct {
-        char            *data;
-        int             len;
-        int             cap;
+        char *data;
+        int len;
+        int cap;
     } headers;
 } hs_response_t;
 
@@ -107,29 +104,31 @@ typedef struct {
  ********************************************
  */
 
-typedef int (*hs_route_callback)(const hs_request_data_t*, const va_list, hs_response_t*);
+typedef int (*hs_route_callback)(hs_response_t *, const hs_request_data_t *, char **, const int);
 
 typedef struct {
-    hs_http_method_e       method;
-    char                *route_tmp;
-    hs_route_callback      cb;
-    va_list             args;
-    int                 n_args;
+    hs_http_method_e method;
+    char *route_tmp;
+    hs_route_callback cb;
+
+    /* internal */
+    regex_t _re;
+    int _n_matches;
 } hs_server_route_t;
 
 typedef struct {
-    void                *mem;
+    void *mem;
 
-    int                 fd;
-    struct sockaddr_in  addr;
+    int fd;
+    struct sockaddr_in addr;
 
-    int                 epoll_fd;
-    struct epoll_event  event;
+    int epoll_fd;
+    struct epoll_event event;
 
-    bool                running;
+    bool running;
 
-    hs_server_route_t      *routes;
-    int                 n_routes;
+    hs_server_route_t *routes;
+    int n_routes;
 } hs_server_t;
 
 /*
@@ -142,8 +141,8 @@ typedef struct {
  *
  */
 HS_API int
-hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_server_route_t *routes, 
-        const int n_routes);
+hs_init_server(hs_server_t *self, const int port, const int to_listen,
+               const hs_server_route_t *routes, const int n_routes);
 
 /**
  *
@@ -154,31 +153,31 @@ hs_start_server(hs_server_t *self);
 /**
  *
  */
-HS_API void 
+HS_API void
 hs_server_destroy(hs_server_t *self);
 
 /**
  *
  */
-HS_API const char*
+HS_API const char *
 hs_get_header(const hs_request_data_t *request, const char *header);
 
 /**
  *
  */
-HS_API int 
+HS_API int
 hs_response_add_header(hs_response_t *resp, const char *key, const char *value);
 
 /**
  *
  */
-HS_API void 
+HS_API void
 hs_response_free(hs_response_t *resp);
 
 /**
  *
  */
-HS_API size_t 
+HS_API size_t
 hs_load_file(const char *filename, char **dest);
 
 #ifdef __cplusplus
@@ -194,6 +193,7 @@ hs_load_file(const char *filename, char **dest);
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
+#include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -212,7 +212,6 @@ hs_load_file(const char *filename, char **dest);
 /* http_server/http_server_internal.h */
 #ifndef HTTP_SERVER_INTERNAL_H_
 #define HTTP_SERVER_INTERNAL_H_
-
 
 /*
  ********************************************
@@ -247,38 +246,36 @@ typedef enum {
 
 typedef struct {
     hs_err_e code;
-    int             errno_;
-    int             line;
+    int errno_;
+    int line;
 } hs_err_t;
 
-HS_LIB const char*
+HS_LIB const char *
 hs_strerror(hs_err_e err);
 
 #define HS_STATIC_ASSERT(expr) typedef char static_assert_##__LINE__[(expr) ? 1 : -1]
 
-#define HS_ERROR_CHECK(_hs_err_var_t, _hs_function)                             \
-    ({                                                                          \
-        HS_STATIC_ASSERT(                                                       \
-                __builtin_types_compatible_p(typeof(_hs_function), hs_err_t));  \
-        hs_err_t _hs_err_tmp = (_hs_function);                                  \
-        (_hs_err_var_t) = _hs_err_tmp;                                          \
-        (_hs_err_var_t.code != HS_OK);                                          \
+#define HS_ERROR_CHECK(_hs_err_var_t, _hs_function)                                     \
+    ({                                                                                  \
+        HS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(_hs_function), hs_err_t)); \
+        hs_err_t _hs_err_tmp = (_hs_function);                                          \
+        (_hs_err_var_t) = _hs_err_tmp;                                                  \
+        (_hs_err_var_t.code != HS_OK);                                                  \
     })
 
-#define HS_CREATE_ERR(_err_e)           \
-    ({                                  \
-        int _saved_errno = errno;       \
-        (hs_err_t){                     \
-            .code = (_err_e),           \
-            .line = __LINE__,           \
-            .errno_ = _saved_errno,     \
-        };                              \
+#define HS_CREATE_ERR(_err_e)       \
+    ({                              \
+        int _saved_errno = errno;   \
+        (hs_err_t){                 \
+            .code = (_err_e),       \
+            .line = __LINE__,       \
+            .errno_ = _saved_errno, \
+        };                          \
     })
 
 #define HS_ERROR_FORMAT "Error(hse='%s'(%d), errno='%s'(%d), line=%d"
 #define HS_ERROR_ARGS(err) \
     hs_strerror((err).code), (err).code, strerror((err).errno_), (err).errno_, (err).line
-
 
 /*
  ********************************************
@@ -294,9 +291,9 @@ typedef enum {
     HS_LOG_LEVEL_ERROR,
 } log_level_e;
 
-HS_LIB void 
-hs_log_log(const log_level_e level, const int line, const char *file, const char *func, 
-        const char *fmt, ...);
+HS_LIB void
+hs_log_log(const log_level_e level, const int line, const char *file, const char *func,
+           const char *fmt, ...);
 
 #define LOG_TRACE(...) hs_log_log(HS_LOG_LEVEL_TRACE, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
 #define LOG_DEBUG(...) hs_log_log(HS_LOG_LEVEL_DEBUG, __LINE__, __FILE__, __FUNCTION__, __VA_ARGS__)
@@ -312,44 +309,43 @@ hs_log_log(const log_level_e level, const int line, const char *file, const char
 
 typedef struct {
     union {
-        void            *mem;
-        char            *data;
+        void *mem;
+        char *data;
     };
-    size_t              len;
-    size_t              cap;
+    size_t len;
+    size_t cap;
 
-    bool                allow_realloc;
+    bool allow_realloc;
 } hs_buffer_t;
 
 /** @brief Inits buffer structure */
-HS_LIB hs_err_t 
+HS_LIB hs_err_t
 hs_buffer_init(hs_buffer_t *self);
 
 /** @brief Inits buffer with set size */
-HS_LIB hs_err_t 
+HS_LIB hs_err_t
 hs_buffer_init_with_size(hs_buffer_t *self, size_t size);
 
 /**
  * @brief Appends `nitems` with size `item_size` from `src` to buffer.
  * @warning This function may throw Assertion if `size_t` max limit reached.
  */
-HS_LIB hs_err_t 
+HS_LIB hs_err_t
 hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, const void *src,
-        void **beginning_ptr);
+                     void **beginning_ptr);
 
 /** @brief Frees mem from buffer structure and sets cap and len to zero */
-HS_LIB void 
+HS_LIB void
 hs_buffer_free(hs_buffer_t *self);
 
 /**  */
 HS_LIB hs_err_t
-hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len, 
-        char **beginning_ptr);
+hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len,
+                          char **beginning_ptr);
 
 /**  */
 HS_LIB hs_err_t
 hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other, void **beginning_ptr);
-
 
 /*
  ********************************************
@@ -360,40 +356,49 @@ hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other, void **beginn
 HS_LIB hs_err_t
 hs_parse_http_request(hs_request_data_t *dest, hs_buffer_t *headers_raw);
 
-
 /*
  ********************************************
  *              HTTP RESPONSE               *
  ********************************************
  */
 
-HS_LIB const char*
+HS_LIB const char *
 hs_get_http_code_str(const int code);
 
-HS_LIB hs_err_t 
-hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest, 
-        int *resp_len);
+HS_LIB hs_err_t
+hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest,
+                 int *resp_len);
 
-HS_LIB hs_err_t 
+HS_LIB hs_err_t
 hs_create_error_response(char **dest, int *dest_size, const int code);
+
+/*
+ ********************************************
+ *              SERVER ROUTE                *
+ ********************************************
+ */
+
+HS_LIB hs_err_t
+hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
+                             const int n_routes);
 
 #endif /* HTTP_SERVER_INTERNAL_H_ */
 
 /* http_server/http_server.c */
-#define READ_HEADERS_CHARS_LIMIT        8192
-#define READ_BUFFER_LEN                 1024
 
-#define MAX_EVENTS                      64
+#define READ_HEADERS_CHARS_LIMIT 8192
+#define READ_BUFFER_LEN 1024
 
-HS_API const char*
+#define MAX_EVENTS 64
+
+HS_API const char *
 hs_get_header(const hs_request_data_t *request, const char *header) {
     for (int i = 0; i < request->n_headers; i++)
-        if (strcmp(header, request->headers[i].key) == 0)
-            return request->headers[i].value;
+        if (strcmp(header, request->headers[i].key) == 0) return request->headers[i].value;
     return NULL;
 }
 
-HS_API int 
+HS_API int
 hs_response_add_header(hs_response_t *resp, const char *key, const char *value) {
     const int key_len = strlen(key), value_len = strlen(value);
     const int total_len = key_len + value_len + 4;  // 4: ": " + "\r\n" symbols
@@ -409,10 +414,10 @@ hs_response_add_header(hs_response_t *resp, const char *key, const char *value) 
         if (resp->headers.data == NULL) return -1;
     }
 
-    if (    strcpy(resp->headers.data + resp->headers.len, key) == NULL ||
-            strcpy(resp->headers.data + resp->headers.len + key_len, ": ") == NULL ||
-            strcpy(resp->headers.data + resp->headers.len + key_len + 2, value) == NULL ||
-            strcpy(resp->headers.data + resp->headers.len + total_len - 2, "\r\n") == NULL)
+    if (strcpy(resp->headers.data + resp->headers.len, key) == NULL ||
+        strcpy(resp->headers.data + resp->headers.len + key_len, ": ") == NULL ||
+        strcpy(resp->headers.data + resp->headers.len + key_len + 2, value) == NULL ||
+        strcpy(resp->headers.data + resp->headers.len + total_len - 2, "\r\n") == NULL)
         return -2;
 
     resp->headers.len += total_len;
@@ -420,7 +425,7 @@ hs_response_add_header(hs_response_t *resp, const char *key, const char *value) 
     return 0;
 }
 
-HS_API void 
+HS_API void
 hs_response_free(hs_response_t *resp) {
     if (resp->headers.data != NULL && resp->headers.cap > 0) {
         resp->headers.cap = 0;
@@ -433,7 +438,7 @@ hs_response_free(hs_response_t *resp) {
     }
 }
 
-HS_API size_t 
+HS_API size_t
 hs_load_file(const char *filename, char **dest) {
     FILE *fd;
     struct stat fd_stat;
@@ -486,8 +491,7 @@ _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
     char buffer[READ_BUFFER_LEN];
     int buffer_len = 0;
 
-    if (HS_ERROR_CHECK(err, hs_buffer_init(dest)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_init(dest))) goto failed;
     dest->allow_realloc = true;
 
     while (new_line_count < 2 && chars_count < READ_HEADERS_CHARS_LIMIT) {
@@ -501,12 +505,11 @@ _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
 
         buffer[buffer_len++] = ch;
         if (buffer_len == READ_BUFFER_LEN) {
-            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, 1024, buffer, NULL)))
-                goto failed;
+            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, 1024, buffer, NULL))) goto failed;
             buffer_len = 0;
         }
 
-        if (ch == '\r') 
+        if (ch == '\r')
             continue;
         else if (ch == '\n')
             new_line_count++;
@@ -514,8 +517,7 @@ _hs_read_headers_raw(const int client_fd, hs_buffer_t *dest) {
             new_line_count = 0;
     }
 
-    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, buffer_len, buffer, NULL)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(dest, 1, buffer_len, buffer, NULL))) goto failed;
 
     return HS_CREATE_ERR(HS_OK);
 
@@ -530,8 +532,7 @@ _hs_read_body(const int client_fd, hs_buffer_t *dest, const int size) {
     char buffer[READ_BUFFER_LEN];
     int total_len = 0;
 
-    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(dest, size)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(dest, size))) goto failed;
 
     while (total_len < size) {
         int to_read = (size - total_len < READ_BUFFER_LEN) ? size - total_len : READ_BUFFER_LEN;
@@ -595,27 +596,24 @@ _hs_send_response(const int fd, const char *response, const int response_len) {
 HS_STATIC hs_err_t
 _hs_handle_client(const hs_server_t *server, const int fd) {
     hs_err_t err = HS_CREATE_ERR(HS_OK);
-    hs_request_data_t request = { 0 };
-    hs_buffer_t headers_raw = { 0 }, content_buf = { 0 };
+    hs_request_data_t request = {0};
+    hs_buffer_t headers_raw = {0}, content_buf = {0};
 
     char *response = NULL;
     int response_len = 0;
 
     LOG_DEBUG("New client handled: %d.", fd);
 
-    if (HS_ERROR_CHECK(err, _hs_read_headers_raw(fd, &headers_raw)))
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, _hs_read_headers_raw(fd, &headers_raw))) goto cleanup;
 
-    if (HS_ERROR_CHECK(err, hs_parse_http_request(&request, &headers_raw)))
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, hs_parse_http_request(&request, &headers_raw))) goto cleanup;
 
     int content_len = _hs_get_content_len(&request);
 
     LOG_DEBUG("Client %d: path=\"%s\".", fd, request.route);
 
     if (content_len > 0) {
-        if (HS_ERROR_CHECK(err, _hs_read_body(fd, &content_buf, content_len)))
-            goto cleanup;
+        if (HS_ERROR_CHECK(err, _hs_read_body(fd, &content_buf, content_len))) goto cleanup;
         request.content_len = content_len;
         request.content = content_buf.data;
     }
@@ -623,8 +621,7 @@ _hs_handle_client(const hs_server_t *server, const int fd) {
     if (HS_ERROR_CHECK(err, hs_form_response(server, &request, &response, &response_len)))
         goto cleanup;
 
-    if (HS_ERROR_CHECK(err, _hs_send_response(fd, response, response_len))) 
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, _hs_send_response(fd, response, response_len))) goto cleanup;
 
 cleanup:
     hs_buffer_free(&headers_raw);
@@ -642,50 +639,10 @@ cleanup:
  ********************************************
  */
 
-/**/
-HS_STATIC void 
+HS_STATIC void
 _hs_set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
-HS_STATIC hs_err_t
-_hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes, const int n_routes) {
-    hs_err_t err;
-    hs_buffer_t buf;
-
-
-    /* count mem */
-    const int routes_list_mem = n_routes * sizeof(hs_server_route_t);
-    int total_mem = routes_list_mem;
-    for (int i = 0; i < n_routes; i++)
-        total_mem += strlen(routes[i].route_tmp) + 1;
-
-    if (    HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, total_mem)) ||
-            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, sizeof(hs_server_route_t), 
-                    n_routes, NULL, NULL)))
-        goto failed;
-
-    self->routes = (hs_server_route_t*)buf.mem;
-
-    if (memcpy(self->routes, routes, routes_list_mem) == NULL) {
-        err = HS_CREATE_ERR(HS_MEMCPY_ERR);
-        goto failed;
-    }
-
-    for (int i = 0; i < n_routes; i++) {
-        if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, routes[i].route_tmp, 
-                        strlen(routes[i].route_tmp), &self->routes[i].route_tmp)))
-            goto failed;
-    }
-
-    self->mem = buf.mem;
-    self->n_routes = n_routes;
-
-    return HS_CREATE_ERR(HS_OK);
-failed:
-    hs_buffer_free(&buf);
-    return err;
 }
 
 HS_STATIC hs_err_t
@@ -711,20 +668,21 @@ HS_API void
 hs_server_destroy(hs_server_t *self) {
     self->running = false;
 
-    if (self->fd > 0)
-        close(self->fd);
+    for (int i = 0; i < self->n_routes; i++) {
+        regfree(&self->routes[i]._re);
+    }
+
+    if (self->fd > 0) close(self->fd);
     self->fd = -1;
 
-    if (self->epoll_fd > 0)
-        close(self->epoll_fd);
+    if (self->epoll_fd > 0) close(self->epoll_fd);
 
-    if (self->mem != NULL)
-        free(self->mem);
+    if (self->mem != NULL) free(self->mem);
 }
 
 HS_API int
-hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_server_route_t *routes, 
-        const int n_routes) {
+hs_init_server(hs_server_t *self, const int port, const int to_listen,
+               const hs_server_route_t *routes, const int n_routes) {
     hs_err_t err;
 
     self->epoll_fd = -1;
@@ -744,10 +702,9 @@ hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_
     self->addr.sin_addr.s_addr = INADDR_ANY;
     self->addr.sin_port = htons(port);
 
-    if (HS_ERROR_CHECK(err, _hs_cpy_init_routes_to_server(self, routes, n_routes)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, hs_cpy_init_routes_to_server(self, routes, n_routes))) goto failed;
 
-    if (bind(self->fd, (struct sockaddr*)&self->addr, sizeof(self->addr)) != 0) {
+    if (bind(self->fd, (struct sockaddr *)&self->addr, sizeof(self->addr)) != 0) {
         err = HS_CREATE_ERR(HS_BIND_ERR);
         goto failed;
     }
@@ -761,18 +718,17 @@ hs_init_server(hs_server_t *self, const int port, const int to_listen, const hs_
 
     self->running = true;
 
-    if (HS_ERROR_CHECK(err, _hs_init_server_epoll(self)))
-        goto failed;
+    if (HS_ERROR_CHECK(err, _hs_init_server_epoll(self))) goto failed;
 
     return HS_OK;
 
 failed:
     hs_server_destroy(self);
-    LOG_ERROR("Failed to init server, "HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
+    LOG_ERROR("Failed to init server, " HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
     return -1;
 }
 
-HS_API int 
+HS_API int
 hs_start_server(hs_server_t *self) {
     hs_err_t err;
     struct epoll_event events[MAX_EVENTS];
@@ -789,7 +745,7 @@ hs_start_server(hs_server_t *self) {
         for (int i = 0; i < n; i++) {
             if (events[i].data.fd == self->fd) {
                 while (1) {
-                    int client_fd = accept(self->fd, (struct sockaddr*)&client_addr, &client_len);
+                    int client_fd = accept(self->fd, (struct sockaddr *)&client_addr, &client_len);
                     if (client_fd == -1) {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             break;
@@ -811,7 +767,7 @@ hs_start_server(hs_server_t *self) {
                 }
             } else {
                 if (HS_ERROR_CHECK(err, _hs_handle_client(self, events[i].data.fd)))
-                    LOG_ERROR("Failed to handle client: "HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
+                    LOG_ERROR("Failed to handle client: " HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
                 if (epoll_ctl(self->epoll_fd, EPOLL_CTL_DEL, events[i].data.fd, NULL) != 0)
                     LOG_ERROR("epoll_ctl error: errno='%s'(%d)", strerror(errno), errno);
                 if (close(events[i].data.fd) != 0)
@@ -824,12 +780,11 @@ hs_start_server(hs_server_t *self) {
 }
 
 /* http_server/buffer.c */
-#define BUFFER_START_CAP    64
+#define BUFFER_START_CAP 64
 
 HS_LIB hs_err_t
 hs_buffer_init(hs_buffer_t *self) {
-    if ((self->mem = malloc(BUFFER_START_CAP)) == NULL)
-        return HS_CREATE_ERR(HS_MALLOC_ERR);
+    if ((self->mem = malloc(BUFFER_START_CAP)) == NULL) return HS_CREATE_ERR(HS_MALLOC_ERR);
     self->cap = BUFFER_START_CAP;
     self->len = 0;
     self->allow_realloc = false;
@@ -838,8 +793,7 @@ hs_buffer_init(hs_buffer_t *self) {
 
 HS_LIB hs_err_t
 hs_buffer_init_with_size(hs_buffer_t *self, size_t size) {
-    if ((self->mem = malloc(size)) == NULL)
-        return HS_CREATE_ERR(HS_MALLOC_ERR);
+    if ((self->mem = malloc(size)) == NULL) return HS_CREATE_ERR(HS_MALLOC_ERR);
     self->cap = size;
     self->len = 0;
     self->allow_realloc = false;
@@ -847,13 +801,12 @@ hs_buffer_init_with_size(hs_buffer_t *self, size_t size) {
 }
 
 HS_LIB hs_err_t
-hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, const void *src, 
-        void **beginning_ptr) {
+hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, const void *src,
+                     void **beginning_ptr) {
     assert(!(SIZE_MAX / item_size < nitems));
     size_t add_size = item_size * nitems;
 
-    if (add_size == 0)
-        return HS_CREATE_ERR(HS_OK);
+    if (add_size == 0) return HS_CREATE_ERR(HS_OK);
 
     assert(SIZE_MAX - self->len >= add_size);
     size_t new_size = self->len + add_size;
@@ -870,8 +823,7 @@ hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, c
         if (SIZE_MAX / 2 < new_size) {
             new_size = SIZE_MAX;
         } else {
-            while (self->cap < new_size)
-                self->cap *= 2;
+            while (self->cap < new_size) self->cap *= 2;
         }
         if ((self->mem = realloc(self->mem, self->cap)) == NULL)
             return HS_CREATE_ERR(HS_MALLOC_ERR);
@@ -880,19 +832,17 @@ hs_buffer_append_mem(hs_buffer_t *self, const int item_size, const int nitems, c
     if (src != NULL && memcpy(self->mem + self->len, src, add_size) == NULL)
         return HS_CREATE_ERR(HS_MEMCPY_ERR);
 
-    if (beginning_ptr != NULL)
-        *beginning_ptr = self->mem + self->len;
+    if (beginning_ptr != NULL) *beginning_ptr = self->mem + self->len;
 
     self->len = new_size;
 
     return HS_CREATE_ERR(HS_OK);
 }
 
-HS_LIB void 
+HS_LIB void
 hs_buffer_free(hs_buffer_t *self) {
     if (self != NULL) {
-        if (self->mem != NULL) 
-            free(self->mem);
+        if (self->mem != NULL) free(self->mem);
         self->len = 0;
         self->cap = 0;
         self->mem = NULL;
@@ -900,15 +850,13 @@ hs_buffer_free(hs_buffer_t *self) {
 }
 
 HS_LIB hs_err_t
-hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len, 
-        char **beginning_ptr) {
+hs_buffer_append_sentence(hs_buffer_t *self, const char *sentence, const size_t sentence_len,
+                          char **beginning_ptr) {
     hs_err_t err;
     if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, 1, sentence_len, sentence, NULL)))
         return err;
-    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, 1, 1, "\0", NULL)))
-        return err;
-    if (beginning_ptr != NULL)
-        *beginning_ptr = self->data + self->len - sentence_len - 1;
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, 1, 1, "\0", NULL))) return err;
+    if (beginning_ptr != NULL) *beginning_ptr = self->data + self->len - sentence_len - 1;
     return HS_CREATE_ERR(HS_OK);
 }
 
@@ -917,49 +865,37 @@ hs_buffer_join_buffer(hs_buffer_t *self, const hs_buffer_t *other, void **beginn
     hs_err_t err;
     if (HS_ERROR_CHECK(err, hs_buffer_append_mem(self, other->len, 1, other->mem, NULL)))
         return err;
-    if (beginning_ptr != NULL)
-        *beginning_ptr = self->mem + self->len - other->len;
+    if (beginning_ptr != NULL) *beginning_ptr = self->mem + self->len - other->len;
     return HS_CREATE_ERR(HS_OK);
 }
 
 /* http_server/http_parser.c */
-static const char
-*HTTP_VERSION_STR[HS_VERSION_LAST] = {
+static const char *HTTP_VERSION_STR[HS_VERSION_LAST] = {
     [HS_VERSION_1_1] = "HTTP/1.1",
 };
 
-static const char
-*HTTP_METHODS_STR[] = {
-    [HS_METHOD_GET]       = "GET",
-    [HS_METHOD_HEAD]      = "HEAD",
-    [HS_METHOD_POST]      = "POST",
-    [HS_METHOD_PUT]       = "PUT",
-    [HS_METHOD_DELETE]    = "DELETE",
-    [HS_METHOD_CONNECT]   = "CONNECT",
-    [HS_METHOD_OPTIONS]   = "OPTIONS",
-    [HS_METHOD_TRACE]     = "TRACE",
+static const char *HTTP_METHODS_STR[] = {
+    [HS_METHOD_GET] = "GET",         [HS_METHOD_HEAD] = "HEAD",     [HS_METHOD_POST] = "POST",
+    [HS_METHOD_PUT] = "PUT",         [HS_METHOD_DELETE] = "DELETE", [HS_METHOD_CONNECT] = "CONNECT",
+    [HS_METHOD_OPTIONS] = "OPTIONS", [HS_METHOD_TRACE] = "TRACE",
 };
 
 HS_STATIC hs_http_version_e
 _hs_parse_http_version(const char *version_str) {
-    if (version_str == NULL)
-        return HS_VERSION_UNKNOWN;
+    if (version_str == NULL) return HS_VERSION_UNKNOWN;
 
     for (int i = 0; i < HS_VERSION_LAST; i++)
-        if (strcmp(version_str, HTTP_VERSION_STR[i]) == 0)
-            return (hs_http_version_e)i;
+        if (strcmp(version_str, HTTP_VERSION_STR[i]) == 0) return (hs_http_version_e)i;
 
     return HS_VERSION_UNKNOWN;
 }
 
 HS_STATIC hs_http_method_e
 _hs_parse_http_method(const char *method_str) {
-    if (method_str == NULL)
-        return HS_METHOD_UNKNOWN;
+    if (method_str == NULL) return HS_METHOD_UNKNOWN;
 
     for (int i = 0; i < HS_METHOD_LAST; i++)
-        if (strcmp(method_str, HTTP_METHODS_STR[i]) == 0)
-            return (hs_http_method_e)i;
+        if (strcmp(method_str, HTTP_METHODS_STR[i]) == 0) return (hs_http_method_e)i;
 
     return HS_METHOD_UNKNOWN;
 }
@@ -969,18 +905,15 @@ _hs_parse_request_line(hs_request_data_t *dest, hs_buffer_t *buf, char *line) {
     char *save_ptr, *token;
     hs_err_t err;
 
-    if ((token = strtok_r(line, " ", &save_ptr)) == NULL)
-        return HS_CREATE_ERR(HS_STRTOK_ERR);
+    if ((token = strtok_r(line, " ", &save_ptr)) == NULL) return HS_CREATE_ERR(HS_STRTOK_ERR);
     dest->method = _hs_parse_http_method(token);
 
-    if ((token = strtok_r(NULL, " ", &save_ptr)) == NULL)
-        return HS_CREATE_ERR(HS_STRTOK_ERR);
+    if ((token = strtok_r(NULL, " ", &save_ptr)) == NULL) return HS_CREATE_ERR(HS_STRTOK_ERR);
     int token_len = strlen(token);
     if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(buf, token, token_len, &dest->route)))
         return err;
 
-    if ((token = strtok_r(NULL, " ", &save_ptr)) == NULL)
-        return HS_CREATE_ERR(HS_STRTOK_ERR);
+    if ((token = strtok_r(NULL, " ", &save_ptr)) == NULL) return HS_CREATE_ERR(HS_STRTOK_ERR);
     dest->version = _hs_parse_http_version(token);
 
     return HS_CREATE_ERR(HS_OK);
@@ -989,9 +922,8 @@ _hs_parse_request_line(hs_request_data_t *dest, hs_buffer_t *buf, char *line) {
 HS_STATIC int
 _hs_count_raw_lines(hs_buffer_t *headers_raw) {
     int counter = 1;
-    for (int i = 0; i < headers_raw->len; i++) 
-        if (headers_raw->data[i] == '\n')
-            counter++;
+    for (int i = 0; i < headers_raw->len; i++)
+        if (headers_raw->data[i] == '\n') counter++;
     return counter;
 }
 
@@ -1007,9 +939,10 @@ _hs_parse_header(hs_header_t *dest, hs_buffer_t *buf, char *line) {
     if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(buf, line, dest->key_len, &dest->key)))
         return err;
 
-    delim_ptr += 2; // ignore ": " ("\0 ")
+    delim_ptr += 2;  // ignore ": " ("\0 ")
     dest->value_len = strlen(delim_ptr);
-    if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(buf, delim_ptr, dest->value_len, &dest->value)))
+    if (HS_ERROR_CHECK(err,
+                       hs_buffer_append_sentence(buf, delim_ptr, dest->value_len, &dest->value)))
         return err;
 
     return HS_CREATE_ERR(HS_OK);
@@ -1021,15 +954,15 @@ hs_parse_http_request(hs_request_data_t *dest, hs_buffer_t *headers_raw) {
     hs_buffer_t req_buf;
     char *save_ptr, *token;
 
-    {   /* exclude request line, empty line and line after empty line */
+    { /* exclude request line, empty line and line after empty line */
         dest->n_headers = _hs_count_raw_lines(headers_raw) - 3;
         size_t headers_size = dest->n_headers * sizeof(hs_header_t);
         size_t buf_size = headers_raw->len + headers_size;
         void *ptr;
-        if (    HS_ERROR_CHECK(err, hs_buffer_init_with_size(&req_buf, buf_size)) ||
-                HS_ERROR_CHECK(err, hs_buffer_append_mem(&req_buf, 1, headers_size, NULL, &ptr)))
+        if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(&req_buf, buf_size)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&req_buf, 1, headers_size, NULL, &ptr)))
             goto cleanup;
-        dest->headers = (hs_header_t*)ptr;
+        dest->headers = (hs_header_t *)ptr;
     }
 
     dest->time = time(NULL);
@@ -1038,15 +971,13 @@ hs_parse_http_request(hs_request_data_t *dest, hs_buffer_t *headers_raw) {
         err = HS_CREATE_ERR(HS_STRTOK_ERR);
         goto cleanup;
     }
-    if (HS_ERROR_CHECK(err, _hs_parse_request_line(dest, &req_buf, token)))
-        goto cleanup;
+    if (HS_ERROR_CHECK(err, _hs_parse_request_line(dest, &req_buf, token))) goto cleanup;
 
     /* We are splitting by '\r', therefore, at the beginning of the line there is '\n' */
-    token = strtok_r(NULL, "\r", &save_ptr) + 1;    /* Ignore '\n' */
+    token = strtok_r(NULL, "\r", &save_ptr) + 1; /* Ignore '\n' */
     for (int i = 0; i < dest->n_headers && token != NULL && strlen(token) > 4; i++) {
         /* header_t new_header; */
-        if (HS_ERROR_CHECK(err, _hs_parse_header(&dest->headers[i], &req_buf, token)))
-            goto cleanup;
+        if (HS_ERROR_CHECK(err, _hs_parse_header(&dest->headers[i], &req_buf, token))) goto cleanup;
 
         token = strtok_r(NULL, "\r", &save_ptr) + 1;
     }
@@ -1063,28 +994,22 @@ cleanup:
 }
 
 /* http_server/logger.c */
-
-static const char
-*_level_strings[] = {
-    [HS_LOG_LEVEL_TRACE] = "TRACE",
-    [HS_LOG_LEVEL_DEBUG] = "DEBUG",
-    [HS_LOG_LEVEL_INFO]  = "INFO",
-    [HS_LOG_LEVEL_WARN]  = "WARN",
-    [HS_LOG_LEVEL_ERROR] = "ERROR",
+static const char *_level_strings[] = {
+    [HS_LOG_LEVEL_TRACE] = "TRACE", [HS_LOG_LEVEL_DEBUG] = "DEBUG", [HS_LOG_LEVEL_INFO] = "INFO",
+    [HS_LOG_LEVEL_WARN] = "WARN",   [HS_LOG_LEVEL_ERROR] = "ERROR",
 };
 
-static const int 
-_level_colors[] = {
-    [HS_LOG_LEVEL_TRACE] = 39,     /* default terminal color */
-    [HS_LOG_LEVEL_DEBUG] = 37,     /* white */
-    [HS_LOG_LEVEL_INFO]  = 32,     /* green */
-    [HS_LOG_LEVEL_WARN]  = 33,     /* yellow */
-    [HS_LOG_LEVEL_ERROR] = 31,     /* red */
+static const int _level_colors[] = {
+    [HS_LOG_LEVEL_TRACE] = 39, /* default terminal color */
+    [HS_LOG_LEVEL_DEBUG] = 37, /* white */
+    [HS_LOG_LEVEL_INFO] = 32,  /* green */
+    [HS_LOG_LEVEL_WARN] = 33,  /* yellow */
+    [HS_LOG_LEVEL_ERROR] = 31, /* red */
 };
 
-HS_LIB void 
-hs_log_log(const log_level_e level, const int line, const char *file, const char *func, 
-        const char *fmt, ...) {
+HS_LIB void
+hs_log_log(const log_level_e level, const int line, const char *file, const char *func,
+           const char *fmt, ...) {
     char time_buf[16], date_buf[16];
     va_list args;
     time_t t = time(NULL);
@@ -1105,41 +1030,38 @@ hs_log_log(const log_level_e level, const int line, const char *file, const char
 }
 
 /* http_server/error.c */
-
-HS_LIB const char*
+HS_LIB const char *
 hs_strerror(hs_err_e err) {
     static const char *hs_error_str[] = {
-        [HS_OK]                    = "Ok",
-        [HS_ROUTE_ERR]             = "Route_err",
+        [HS_OK] = "Ok",
+        [HS_ROUTE_ERR] = "Route_err",
         /* General */
-        [HS_MALLOC_ERR]            = "Malloc_err",
-        [HS_STDIO_ERR]             = "Stdio_err",
+        [HS_MALLOC_ERR] = "Malloc_err",
+        [HS_STDIO_ERR] = "Stdio_err",
         /* string errors */
-        [HS_STRTOK_ERR]            = "Strtok_err",
-        [HS_STRCPY_ERR]            = "Strcpy_err",
-        [HS_STRCAT_ERR]            = "Strcat_err",
-        [HS_MEMCPY_ERR]            = "Memcpy_err",
-        [HS_MEMSET_ERR]            = "Memset_err",
+        [HS_STRTOK_ERR] = "Strtok_err",
+        [HS_STRCPY_ERR] = "Strcpy_err",
+        [HS_STRCAT_ERR] = "Strcat_err",
+        [HS_MEMCPY_ERR] = "Memcpy_err",
+        [HS_MEMSET_ERR] = "Memset_err",
         /* Server init errors */
-        [HS_SOCKET_CREATE_ERR]     = "Socket_create_err",
-        [HS_BIND_ERR]              = "Bind_err",
-        [HS_LISTEN_ERR]            = "Listen_err",
-        [HS_EPOLL_CREATE_ERR]      = "Epoll_create_err",
-        [HS_EPOLL_CTL_ERR]         = "Epoll_ctl_err",
-        [HS_WRITE_ERR]             = "Write_err",
+        [HS_SOCKET_CREATE_ERR] = "Socket_create_err",
+        [HS_BIND_ERR] = "Bind_err",
+        [HS_LISTEN_ERR] = "Listen_err",
+        [HS_EPOLL_CREATE_ERR] = "Epoll_create_err",
+        [HS_EPOLL_CTL_ERR] = "Epoll_ctl_err",
+        [HS_WRITE_ERR] = "Write_err",
         /* Socket errors */
-        [HS_SOCKET_READ_ERR]       = "Socket_read_err",
+        [HS_SOCKET_READ_ERR] = "Socket_read_err",
         /* buffer errors */
-        [HS_BUFFER_OVERFLOW_ERR]   = "Buffer_overflow_err",
+        [HS_BUFFER_OVERFLOW_ERR] = "Buffer_overflow_err",
     };
 
     return hs_error_str[err];
 }
 
 /* http_server/http_response.c */
-
-static const char
-*HTTP_CODE_STR[] = {
+static const char *HTTP_CODE_STR[] = {
     [100] = "CONTINUE",
     [101] = "SWITCHING PROTOCOLS",
     [200] = "OK",
@@ -1183,10 +1105,9 @@ static const char
     [505] = "HTTP VERSION NOT SUPPORTED",
 };
 
-HS_LIB const char*
+HS_LIB const char *
 get_http_code_str(const int code) {
-    if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8)
-        return "UNKNOWN";
+    if (code < 0 || code > sizeof(HTTP_CODE_STR) / 8) return "UNKNOWN";
     const char *res = HTTP_CODE_STR[code];
     return (res != NULL) ? res : "UNKNOWN";
 }
@@ -1197,32 +1118,55 @@ get_http_code_str(const int code) {
  ********************************************
  */
 
-HS_STATIC hs_server_route_t* 
+HS_STATIC hs_server_route_t *
 _find_route(const hs_server_t *server, const hs_request_data_t *request) {
-    hs_server_route_t *found_route = NULL;
-    va_list args_cpy;
-
     for (int i = 0; i < server->n_routes; i++) {
         hs_server_route_t *route = &server->routes[i];
-        if (route->n_args > 0) {
-            va_copy(args_cpy, route->args);
-            if (vsscanf(request->route, route->route_tmp, args_cpy) == route->n_args) {
-                found_route = route;
-                break;
-            }
-        } else if (strcmp(route->route_tmp, request->route) == 0) {
-            found_route = route;
-            break;
+        if (request->method == route->method &&
+            regexec(&route->_re, request->route, 0, NULL, 0) == 0) {
+            return route;
         }
     }
-
-    return found_route;
+    return NULL;
 }
 
 HS_STATIC hs_err_t
-_process_route(hs_server_route_t *route, const hs_request_data_t *request, char **resp_dest, 
-        int *resp_len) {
-    static const char resp_fmt[] = 
+_hs_parse_route_matches(const hs_request_data_t *req, const hs_server_route_t *route,
+                        char ***matches) {
+    hs_err_t err;
+    hs_buffer_t buf;
+    regmatch_t *rematches;
+
+    rematches = malloc(sizeof(regmatch_t) * (1 + route->_n_matches));
+
+    const int arr_size = sizeof(char *) * route->_n_matches;
+    const int route_len = strlen(req->route);
+
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, arr_size + route_len))) goto failed;
+    buf.len += arr_size;
+
+    if (regexec(&route->_re, req->route, route->_n_matches + 1, rematches, 0) == 0) {
+        for (int i = 0; i < route->_n_matches; i++) {
+            err = hs_buffer_append_sentence(&buf, req->route + rematches[i + 1].rm_so,
+                                            rematches[i + 1].rm_eo - rematches[i + 1].rm_so,
+                                            buf.mem + i * sizeof(char *));
+            if (err.code != HS_OK) goto failed;
+        }
+    }
+
+    *matches = buf.mem;
+    free(rematches);
+    return HS_CREATE_ERR(HS_OK);
+failed:
+    free(rematches);
+    hs_buffer_free(&buf);
+    return err;
+}
+
+HS_STATIC hs_err_t
+_process_route(hs_server_route_t *route, const hs_request_data_t *request, char **resp_dest,
+               int *resp_len) {
+    static const char resp_fmt[] =
         "HTTP/1.1 %3d %s\r\n"
         "Content-Type: %s\r\n"
         "Content-Length: %d\r\n"
@@ -1230,16 +1174,19 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
         "%s"
         "\r\n";
 
-    hs_err_e err_e = HS_OK;
+    hs_err_t err = HS_CREATE_ERR(HS_OK);
     const char *type_str, *subtype_str;
-    va_list args_cpy;
-    hs_response_t resp = { 0 };
+    hs_response_t resp = {0};
+    char **matches = NULL;
 
-    va_copy(args_cpy, route->args);
+    if (route->_n_matches > 0 &&
+        HS_ERROR_CHECK(err, _hs_parse_route_matches(request, route, &matches))) {
+        // TODO: process err
+        goto cleanup;
+    }
 
-
-    if (route->cb(request, args_cpy, &resp) != 0) {
-        err_e = HS_ROUTE_ERR;
+    if (route->cb(&resp, request, matches, route->_n_matches) != 0) {
+        err = HS_CREATE_ERR(HS_ROUTE_ERR);
         goto cleanup;
     }
 
@@ -1248,20 +1195,20 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
     *resp_dest = malloc(resp.content_len + code_str_len + sizeof(resp_fmt) + 256);
     if (*resp_dest == NULL) {
-        err_e = HS_MALLOC_ERR;
+        err = HS_CREATE_ERR(HS_MALLOC_ERR);
         goto cleanup;
     }
 
-    *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type, 
-            resp.content_len, (resp.headers.len <= 0) ? "" : resp.headers.data);
+    *resp_len = sprintf(*resp_dest, resp_fmt, resp.code, code_str, resp.content_type,
+                        resp.content_len, (resp.headers.len <= 0) ? "" : resp.headers.data);
     if (*resp_len <= 0) {
-        err_e = HS_STDIO_ERR;
+        err = HS_CREATE_ERR(HS_STDIO_ERR);
         goto cleanup;
     }
 
     if (resp.content_len > 0) {
         if (memcpy((*resp_dest) + (*resp_len), resp.content, resp.content_len) == NULL) {
-            err_e = HS_MEMCPY_ERR;
+            err = HS_CREATE_ERR(HS_MEMCPY_ERR);
             goto cleanup;
         }
         *resp_len += resp.content_len;
@@ -1269,12 +1216,13 @@ _process_route(hs_server_route_t *route, const hs_request_data_t *request, char 
 
 cleanup:
     hs_response_free(&resp);
-    return HS_CREATE_ERR(err_e);
+    free(matches);
+    return err;
 }
 
 HS_LIB hs_err_t
-hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest, 
-        int *resp_len) {
+hs_form_response(const hs_server_t *server, const hs_request_data_t *request, char **resp_dest,
+                 int *resp_len) {
     hs_err_t err;
     hs_server_route_t *found_route = _find_route(server, request);
 
@@ -1282,8 +1230,7 @@ hs_form_response(const hs_server_t *server, const hs_request_data_t *request, ch
     *resp_len = 0;
 
     if (found_route == NULL) {
-        if (HS_ERROR_CHECK(err, hs_create_error_response(resp_dest, resp_len, 404)))
-            return err;
+        if (HS_ERROR_CHECK(err, hs_create_error_response(resp_dest, resp_len, 404))) return err;
     } else {
         if (HS_ERROR_CHECK(err, _process_route(found_route, request, resp_dest, resp_len))) {
             *resp_dest = NULL;
@@ -1300,29 +1247,27 @@ hs_form_response(const hs_server_t *server, const hs_request_data_t *request, ch
  ********************************************
  */
 
-static const char 
-ERROR_FMT[] = 
-"HTTP/1.1 %3d %s\r\n"
-"Content-Length: %d\r\n"
-"Content-Type: text/html\r\n"
-"Connection: Closed\r\n"
-"\r\n";
+static const char ERROR_FMT[] =
+    "HTTP/1.1 %3d %s\r\n"
+    "Content-Length: %d\r\n"
+    "Content-Type: text/html\r\n"
+    "Connection: Closed\r\n"
+    "\r\n";
 
-static const char 
-ERROR_PAGE_BODY[] = 
-"<!DOCTYPE html>"
-"<html lang=\"en\">"
-"<head>"
-"<meta charset=\"UTF-8\">"
-"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
-"<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">"
-"<title>%3d %s</title>"
-"</head>"
-"<body>"
-"<h1>Failed to load page</h1>"
-"<h1>%3d %s</h1>"
-"</body>"
-"</html>";
+static const char ERROR_PAGE_BODY[] =
+    "<!DOCTYPE html>"
+    "<html lang=\"en\">"
+    "<head>"
+    "<meta charset=\"UTF-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+    "<meta http-equiv=\"X-UA-Compatible\" content=\"ie=edge\">"
+    "<title>%3d %s</title>"
+    "</head>"
+    "<body>"
+    "<h1>Failed to load page</h1>"
+    "<h1>%3d %s</h1>"
+    "</body>"
+    "</html>";
 
 HS_LIB hs_err_t
 hs_create_error_response(char **dest, int *dest_size, const int code) {
@@ -1347,15 +1292,15 @@ hs_create_error_response(char **dest, int *dest_size, const int code) {
         goto failed;
     }
 
-    const int fin_header_len = snprintf(*dest, header_len, ERROR_FMT, code, code_str, 
-            fin_content_len);
+    const int fin_header_len =
+        snprintf(*dest, header_len, ERROR_FMT, code, code_str, fin_content_len);
     if (fin_content_len <= 0) {
         err_e = HS_STDIO_ERR;
         goto failed;
     }
 
-    if (snprintf(*dest + fin_header_len, content_len, ERROR_PAGE_BODY, code, code_str, code, 
-                code_str) <= 0) {
+    if (snprintf(*dest + fin_header_len, content_len, ERROR_PAGE_BODY, code, code_str, code,
+                 code_str) <= 0) {
         err_e = HS_STDIO_ERR;
         goto failed;
     }
@@ -1371,6 +1316,175 @@ failed:
     }
     *dest_size = 0;
     return HS_CREATE_ERR(err_e);
+}
+
+/* http_server/server_route.c */
+#define HS_FORMAT_TYPE_LAST (HS_FORMAT_TYPE_INT)
+typedef enum {
+    HS_FORMAT_TYPE_STR = 0,
+    HS_FORMAT_TYPE_INT,
+} hs_format_types_e;
+
+static const char *HS_FORMAT_USER_STR[] = {
+    [HS_FORMAT_TYPE_STR] = "{str}",
+    [HS_FORMAT_TYPE_INT] = "{int}",
+};
+
+static const char *HS_FORMAT_REGEX[] = {
+    [HS_FORMAT_TYPE_STR] = "[[:alnum:]]+",
+    [HS_FORMAT_TYPE_INT] = "[[:digit:]]+",
+};
+
+HS_STATIC const char *
+_hs_find_user_str(const char *str, const int len) {
+    for (int i = 0; i <= HS_FORMAT_TYPE_LAST; i++) {
+        if (strncmp(str, HS_FORMAT_USER_STR[i], len) == 0) {
+            return HS_FORMAT_REGEX[i];
+        }
+    }
+    return NULL;
+}
+
+HS_STATIC bool
+_hs_should_escape(const char ch) {
+    static const char TO_ESCAPE[] = {'.', '^', '$', '*', '+', '?', '{',
+                                     '}', '[', ']', '(', ')', '`', '\\'};
+
+    for (int i = 0; i < sizeof(TO_ESCAPE); i++) {
+        if (ch == TO_ESCAPE[i]) return true;
+    }
+    return false;
+}
+
+HS_STATIC hs_err_t
+_hs_escape_char_and_add(const char *str, const int len, hs_buffer_t *buf) {
+    hs_err_t err;
+    for (int i = 0; i < len; i++) {
+        if (_hs_should_escape(str[i])) {
+            if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, "\\", NULL))) return err;
+        }
+        if (HS_ERROR_CHECK(err, hs_buffer_append_mem(buf, 1, 1, &str[i], NULL))) return err;
+    }
+    return HS_CREATE_ERR(HS_OK);
+}
+
+HS_STATIC hs_err_t
+_hs_create_regex_from_user_str(const char *str, char **re, int *n_matches) {
+    hs_err_t err;
+    hs_buffer_t buf;
+    int last_c = 0;
+    ;
+    *n_matches = 0;
+    char *start, *end;
+
+    hs_buffer_init(&buf);
+    if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "^", NULL)))
+        goto failed;
+
+    while ((start = strchr(str + last_c, '{')) != NULL) {
+        if (HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, start - str, &buf)))
+            goto failed;
+
+        last_c = start - str;
+        if ((end = strchr(str, '}')) == NULL) {
+            err = HS_CREATE_ERR(HS_ROUTE_ERR);
+            goto failed;
+        }
+
+        (*n_matches)++;
+
+        const int fmt_len = end - start + 1;
+        const char *re_fmt = _hs_find_user_str(start, fmt_len);
+        if (re_fmt == NULL) {
+            LOG_ERROR("Incorrect format: '%.*s'.", fmt_len, start);
+            err = HS_CREATE_ERR(HS_ROUTE_ERR);
+            goto failed;
+        }
+
+        if (HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "(", NULL)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, strlen(re_fmt), re_fmt, NULL)) ||
+            HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, ")", NULL)))
+            goto failed;
+        last_c = end - str + 1;
+    }
+
+    if (HS_ERROR_CHECK(err, _hs_escape_char_and_add(str + last_c, strlen(str + last_c), &buf)) ||
+        HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "$", NULL)) ||
+        HS_ERROR_CHECK(err, hs_buffer_append_mem(&buf, 1, 1, "\0", NULL)))
+        goto failed;
+
+    *re = buf.data;
+
+    return HS_CREATE_ERR(HS_OK);
+
+failed:
+    *re = NULL;
+    *n_matches = 0;
+    hs_buffer_free(&buf);
+    return err;
+}
+
+HS_LIB hs_err_t
+hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
+                             const int n_routes) {
+    hs_err_t err;
+    hs_buffer_t buf = {0};
+    char *route_re = NULL;
+    int re_init_n = 0;
+
+    /* count mem */
+    const int routes_list_mem = n_routes * sizeof(hs_server_route_t);
+    int total_mem = routes_list_mem;
+    for (int i = 0; i < n_routes; i++) {
+        int tmp = 0;
+        if (HS_ERROR_CHECK(err,
+                           _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re, &tmp)))
+            goto failed;
+        total_mem += strlen(route_re) + 1;
+        free(route_re);
+        route_re = NULL;
+    }
+
+    if (HS_ERROR_CHECK(err, hs_buffer_init_with_size(&buf, total_mem)) ||
+        HS_ERROR_CHECK(err,
+                       hs_buffer_append_mem(&buf, sizeof(hs_server_route_t), n_routes, NULL, NULL)))
+        goto failed;
+
+    self->routes = (hs_server_route_t *)buf.mem;
+
+    if (memcpy(self->routes, routes, routes_list_mem) == NULL) {
+        err = HS_CREATE_ERR(HS_MEMCPY_ERR);
+        goto failed;
+    }
+
+    for (int i = 0; i < n_routes; i++) {
+        if (HS_ERROR_CHECK(err, _hs_create_regex_from_user_str(routes[i].route_tmp, &route_re,
+                                                               &self->routes[i]._n_matches)))
+            goto failed;
+        if (HS_ERROR_CHECK(err, hs_buffer_append_sentence(&buf, route_re, strlen(route_re),
+                                                          &self->routes[i].route_tmp)))
+            goto failed;
+        if (regcomp(&self->routes[i]._re, self->routes[i].route_tmp, REG_EXTENDED) != 0)
+            goto failed;
+        re_init_n++;
+        free(route_re);
+        route_re = NULL;
+
+        LOG_TRACE("New route created for tmp '%s': '%s' (%d).", routes[i].route_tmp,
+                  self->routes[i].route_tmp, self->routes[i]._n_matches);
+    }
+
+    self->mem = buf.mem;
+    self->n_routes = n_routes;
+
+    return HS_CREATE_ERR(HS_OK);
+failed:
+    if (route_re != NULL) free(route_re);
+    hs_buffer_free(&buf);
+    for (int i = 0; i < re_init_n; i++) {
+        regfree(&self->routes[i]._re);
+    }
+    return err;
 }
 
 #endif /* HS_IMPLEMENTATION */

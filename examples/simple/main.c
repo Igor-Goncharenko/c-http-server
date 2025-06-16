@@ -1,15 +1,16 @@
-#include "../../http_server.h"
-
 #include <assert.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <string.h>
 
-#define n_routes 3
+#include "../../http_server.h"
 
-int home_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+#define n_routes 4
+
+int home_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                  const int n_data) {
     if ((dest->content_len = hs_load_file("home.html", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -20,15 +21,25 @@ int home_callback(const hs_request_data_t *request, const va_list args, hs_respo
     return 0;
 }
 
-int home_css_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
-    if ((dest->content_len = hs_load_file("home.css", &dest->content)) <= 0) return -1;
+int css_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                 const int n_data) {
+    int len = strlen(data[0]);
+    char *filename = malloc(len + 5);
+
+    strcpy(filename, data[0]);
+    strcat(filename, ".css");
+
+    if ((dest->content_len = hs_load_file(filename, &dest->content)) <= 0) return -1;
     dest->code = 200;
     strcpy(dest->content_type, "text/css");
+
+    free(filename);
 
     return 0;
 }
 
-int favicon_callback(const hs_request_data_t *request, const va_list args, hs_response_t *dest) {
+int favicon_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                     const int n_data) {
     if ((dest->content_len = hs_load_file("favicon.ico", &dest->content)) <= 0) return -1;
 
     dest->code = 200;
@@ -37,11 +48,20 @@ int favicon_callback(const hs_request_data_t *request, const va_list args, hs_re
     return 0;
 }
 
+int user_callback(hs_response_t *dest, const hs_request_data_t *request, char **data,
+                  const int n_data) {
+    static const char fmt[] = "<h1>User #%s</h1>";
+    const int data_len = strlen(data[0]);
+    dest->content = malloc(strlen(fmt) + data_len);
+    dest->content_len = sprintf(dest->content, fmt, data[0]);
+    dest->code = 200;
+    strcpy(dest->content_type, "text/html");
+    return 0;
+}
+
 hs_server_t server;
 
-void cleanup(void) {
-    hs_server_destroy(&server);
-}
+void cleanup(void) { hs_server_destroy(&server); }
 
 void handle_sigint(int sig) {
     printf("Handled SIGINT\n");
@@ -71,19 +91,21 @@ int main(int argc, char *argv[]) {
             .method = HS_METHOD_GET,
             .route_tmp = "/",
             .cb = home_callback,
-            .n_args = 0,
         },
         {
             .method = HS_METHOD_GET,
-            .route_tmp = "/home.css",
-            .cb = home_css_callback,
-            .n_args = 0,
+            .route_tmp = "/{str}.css",
+            .cb = css_callback,
         },
         {
             .method = HS_METHOD_GET,
             .route_tmp = "/favicon.ico",
             .cb = favicon_callback,
-            .n_args = 0,
+        },
+        {
+            .method = HS_METHOD_GET,
+            .route_tmp = "/users/{int}",
+            .cb = user_callback,
         },
     };
 
