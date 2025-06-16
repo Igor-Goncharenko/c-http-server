@@ -29,6 +29,7 @@ typedef enum {
     HS_MEMSET_ERR,
     /* Server init errors */
     HS_SOCKET_CREATE_ERR,
+    HS_ACCEPT_ERR,
     HS_BIND_ERR,
     HS_LISTEN_ERR,
     HS_EPOLL_CREATE_ERR,

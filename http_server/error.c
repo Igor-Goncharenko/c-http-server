@@ -20,6 +20,7 @@ hs_strerror(hs_err_e err) {
         [HS_MEMSET_ERR] = "Memset_err",
         /* Server init errors */
         [HS_SOCKET_CREATE_ERR] = "Socket_create_err",
+        [HS_ACCEPT_ERR] = "Accept_err",
         [HS_BIND_ERR] = "Bind_err",
         [HS_LISTEN_ERR] = "Listen_err",
         [HS_EPOLL_CREATE_ERR] = "Epoll_create_err",

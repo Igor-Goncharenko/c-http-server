@@ -238,6 +238,7 @@ typedef enum {
     HS_MEMSET_ERR,
     /* Server init errors */
     HS_SOCKET_CREATE_ERR,
+    HS_ACCEPT_ERR,
     HS_BIND_ERR,
     HS_LISTEN_ERR,
     HS_EPOLL_CREATE_ERR,
@@ -768,18 +769,46 @@ failed:
     return -1;
 }
 
+HS_STATIC hs_err_t
+_hs_client_acceptor(const int fd, const int epoll_fd) {
+    struct sockaddr_in client_addr;
+    socklen_t client_len = sizeof(client_addr);
+
+    while (1) {
+        int client_fd = accept(fd, (struct sockaddr *)&client_addr, &client_len);
+        if (client_fd == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                break;
+            } else {
+                return HS_CREATE_ERR(HS_ACCEPT_ERR);
+            }
+        }
+
+        _hs_set_nonblocking(client_fd);
+
+        struct epoll_event ev;
+        ev.events = EPOLLIN | EPOLLET;
+        ev.data.fd = client_fd;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
+            LOG_ERROR("Epoll ctl error: client_socket: '%s'(%d).", strerror(errno), errno);
+            close(client_fd);
+            return HS_CREATE_ERR(HS_EPOLL_CTL_ERR);
+        }
+    }
+
+    return HS_CREATE_ERR(HS_OK);
+}
+
 HS_API int
 hs_start_server(hs_server_t *self) {
     hs_err_t err;
     struct epoll_event events[MAX_EVENTS];
-    struct sockaddr_in client_addr;
-    socklen_t client_len = sizeof(client_addr);
 
     while (self->running) {
         int n = epoll_wait(self->epoll_fd, events, MAX_EVENTS, -1);
         if (n == -1) {
-            perror("epoll_wait");
-            break;
+            LOG_ERROR("Epoll wait error: '%s'(%d).", strerror(errno), errno);
+            return -1;
         }
 
         for (int i = 0; i < n; i++) {
@@ -793,28 +822,9 @@ hs_start_server(hs_server_t *self) {
             }
 
             if (events[i].data.fd == self->fd) {
-                while (1) {
-                    int client_fd = accept(self->fd, (struct sockaddr *)&client_addr, &client_len);
-                    if (client_fd == -1) {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            break;
-                        } else {
-                            LOG_ERROR("accept error: errno='%s'(%d)", strerror(errno), errno);
-                            perror("accept");
-                            break;
-                        }
-                    }
+                if (HS_ERROR_CHECK(err, _hs_client_acceptor(self->fd, self->epoll_fd)))
+                    LOG_ERROR("Acceptor error: " HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
 
-                    _hs_set_nonblocking(client_fd);
-
-                    struct epoll_event ev;
-                    ev.events = EPOLLIN | EPOLLET;
-                    ev.data.fd = client_fd;
-                    if (epoll_ctl(self->epoll_fd, EPOLL_CTL_ADD, client_fd, &ev) == -1) {
-                        perror("epoll_ctl: client_socket");
-                        close(client_fd);
-                    }
-                }
             } else {
                 if (HS_ERROR_CHECK(err, _hs_handle_client(self, events[i].data.fd)))
                     LOG_ERROR("Failed to handle client: " HS_ERROR_FORMAT, HS_ERROR_ARGS(err));
@@ -1098,6 +1108,7 @@ hs_strerror(hs_err_e err) {
         [HS_MEMSET_ERR] = "Memset_err",
         /* Server init errors */
         [HS_SOCKET_CREATE_ERR] = "Socket_create_err",
+        [HS_ACCEPT_ERR] = "Accept_err",
         [HS_BIND_ERR] = "Bind_err",
         [HS_LISTEN_ERR] = "Listen_err",
         [HS_EPOLL_CREATE_ERR] = "Epoll_create_err",
