@@ -5,15 +5,18 @@ CFLAGS += -O0 -g
 SRC = main.c
 OUT = out
 
-.PHONY: all compile debug clean
+.PHONY: all compile debug clean valgrind
 
-all: compile debug clean
+all: compile
 
 compile:
 	$(CC) $(CFLAGS) -o $(OUT) $(SRC)
 
-debug:
+debug: compile
 	gdb -tui ./$(OUT)
+
+valgrind: compile
+	valgrind --leak-check=full ./$(OUT)
 
 clean:
 	rm -f $(OUT)
