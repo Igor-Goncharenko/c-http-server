@@ -3,7 +3,7 @@ SRC_DIR = http_server
 OUTPUT = http_server.h
 PUB = http_server.h
 PRIVATE = http_server_internal.h
-SRC = http_server.c buffer.c http_parser.c logger.c error.c http_response.c server_route.c
+SRC = $(wildcard $(SRC_DIR)/*.c)
 
 MACRO = HS
 
@@ -16,7 +16,7 @@ build:
 		--macro $(MACRO) \
 		--output $(OUTPUT) \
 		--pub $(addprefix $(SRC_DIR)/, $(PUB)) \
-		--src $(addprefix $(SRC_DIR)/, $(SRC)) \
+		--src $(SRC) \
 		--private $(addprefix $(SRC_DIR)/, $(PRIVATE))
 
 

@@ -179,4 +179,13 @@ HS_LIB hs_err_t
 hs_cpy_init_routes_to_server(hs_server_t *self, const hs_server_route_t *routes,
                              const int n_routes);
 
+/*
+ ********************************************
+ *              CLIENT HANDLER              *
+ ********************************************
+ */
+
+HS_API hs_err_t
+hs_handle_client(const hs_server_t *server, const int fd);
+
 #endif /* HTTP_SERVER_INTERNAL_H_ */
