@@ -573,23 +573,6 @@ _hs_get_content_len(const hs_request_data_t *request) {
 }
 
 HS_STATIC hs_err_t
-_hs_send_internal_error(const int fd) {
-    hs_err_t err;
-    char *resp = NULL;
-    int resp_len;
-    if (HS_ERROR_CHECK(err, hs_create_error_response(&resp, &resp_len, 500))) {
-        return err;
-    }
-
-    write(fd, resp, resp_len);
-    if (resp != NULL) {
-        free(resp);
-    }
-
-    return HS_CREATE_ERR(HS_OK);
-}
-
-HS_STATIC hs_err_t
 _hs_send_response(const int fd, const char *response, const int response_len) {
     if (response_len <= 0 || response == NULL) return HS_CREATE_ERR(HS_WRITE_ERR);
     int bytes_sent = 0;
@@ -603,6 +586,21 @@ _hs_send_response(const int fd, const char *response, const int response_len) {
         bytes_sent += n;
     }
     return HS_CREATE_ERR(HS_OK);
+}
+
+HS_STATIC hs_err_t
+_hs_send_internal_error(const int fd) {
+    hs_err_t err = HS_CREATE_ERR(HS_OK);
+    char *resp = NULL;
+    int resp_len;
+
+    if (HS_ERROR_CHECK(err, hs_create_error_response(&resp, &resp_len, 500))) goto cleanup;
+
+    if (resp != NULL && HS_ERROR_CHECK(err, _hs_send_response(fd, resp, resp_len))) goto cleanup;
+
+cleanup:
+    if (resp != NULL) free(resp);
+    return err;
 }
 
 HS_API hs_err_t
